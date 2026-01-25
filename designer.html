@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adaptive Video Designer</title>
+    <!-- Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/reactflow/dist/style.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .react-flow__node { cursor: default; }
+        .react-flow__handle { width: 8px; height: 8px; border-radius: 2px; border: 1px solid #111827; }
+        .react-flow__attribution { display: none; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 overflow-hidden">
+    <div id="root"></div>
+
+    <!-- Babel Standalone to support JSX in standard HTML files -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- React and Dependencies - Fixed with external resolution to prevent multiple React instances -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom": "https://esm.sh/react-dom@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "reactflow": "https://esm.sh/reactflow@11.10.1?external=react,react-dom",
+            "lucide-react": "https://esm.sh/lucide-react@0.263.1?external=react,react-dom",
+            "react-hot-toast": "https://esm.sh/react-hot-toast@2.4.1?external=react,react-dom"
+        }
+    }
+    </script>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useCallback, useRef, useMemo, memo, useEffect } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import ReactFlow, { 
+            ReactFlowProvider, 
+            addEdge, 
+            useNodesState, 
+            useEdgesState, 
+            Controls, 
+            Background, 
+            Handle, 
+            Position, 
+            useEdges, 
+            Panel 
+        } from 'reactflow';
+        import { 
+            Video, 
+            HelpCircle, 
+            PlayCircle, 
+            Settings2, 
+            LogOut, 
+            Download, 
+            Code, 
+            Trash2, 
+            Copy, 
+            X, 
+            CheckCircle2, 
+            Circle, 
+            Eraser, 
+            RotateCcw,
+            GripVertical,
+            CheckCircle
+        } from 'lucide-react';
+        import toast, { Toaster } from 'react-hot-toast';
+
+        // --- Types & Constants ---
+        const NodeType = {
+            PRIMARY_VIDEO: 'primaryVideo',
+            POPUP_VIDEO: 'popupVideo',
+            OPTIONS: 'options',
+            ACTION: 'action'
+        };
+
+        const TriggerType = {
+            AT_END: 'AT_END',
+            AT_TIME: 'AT_TIME',
+            ON_CORRECT: 'ON_CORRECT',
+            ON_WRONG: 'ON_WRONG',
+            ON_CLEAR: 'ON_CLEAR',
+            ON_NOT_CLEAR: 'ON_NOT_CLEAR',
+            DEFAULT: 'DEFAULT'
+        };
+
+        let nodeId = 1;
+        const getNextId = () => `node_${nodeId++}`;
+
+        // --- Utility Functions ---
+        const buildFlowJson = (nodes, edges) => {
+            const jsonNodes = nodes.map(node => {
+                const outgoingEdges = edges.filter(e => e.source === node.id);
+                const isMediaNode = node.type === NodeType.PRIMARY_VIDEO || node.type === NodeType.POPUP_VIDEO;
+                const hasEndTrigger = outgoingEdges.some(edge => edge.data?.trigger === TriggerType.AT_END);
+                const isTerminal = isMediaNode ? !hasEndTrigger : outgoingEdges.length === 0;
+
+                const events = outgoingEdges.map(edge => ({
+                    targetNodeId: edge.target,
+                    trigger: edge.data?.trigger,
+                    triggerTime: edge.data?.time,
+                    label: edge.data?.label
+                }));
+
+                return {
+                    id: node.id,
+                    type: node.type,
+                    data: { ...node.data, isEndOfLesson: isTerminal },
+                    meta: { isTerminal, nodeStatus: isTerminal ? 'TERMINAL_EXIT' : 'CONTINUES' },
+                    events
+                };
+            });
+
+            return {
+                flowId: crypto.randomUUID(),
+                createdAt: new Date().toISOString(),
+                nodes: jsonNodes,
+                connections: edges.map(e => ({ source: e.source, target: e.target, logic: e.data }))
+            };
+        };
+
+        // --- Custom Components ---
+
+        const NodeWrapper = ({ selected, title, icon: Icon, colorClass, isTerminal, children }) => (
+            <div className={`min-w-[240px] rounded-xl border-2 bg-gray-900 shadow-xl transition-all duration-200 relative ${
+                selected ? 'border-white shadow-indigo-500/20' : 'border-gray-700 hover:border-gray-600'
+            }`}>
+                {isTerminal && (
+                    <div className="absolute -top-3 -right-2 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg flex items-center gap-1 animate-pulse border border-gray-900 z-10 uppercase">
+                        <LogOut size={10} /> End of Lesson
+                    </div>
+                )}
+                <div className={`px-4 py-2 rounded-t-lg border-b border-gray-800 flex items-center gap-2 ${colorClass}`}>
+                    <Icon size={16} className="text-white" />
+                    <span className="font-semibold text-sm text-white">{title}</span>
+                </div>
+                <div className="p-4 space-y-2">{children}</div>
+            </div>
+        );
+
+        const PrimaryVideoNode = memo(({ id, data, selected }) => {
+            const edges = useEdges();
+            const isTerminal = !edges.filter(e => e.source === id).some(e => e.data?.trigger === TriggerType.AT_END);
+            return (
+                <NodeWrapper selected={selected} title="Primary Video" icon={Video} colorClass="bg-indigo-600" isTerminal={isTerminal}>
+                    <Handle type="target" position={Position.Top} className="!bg-indigo-500 !w-3 !h-3" />
+                    <div className="text-xs text-gray-400">Video URL</div>
+                    <div className="text-sm text-gray-200 truncate font-mono bg-gray-800 p-1.5 rounded border border-gray-700">
+                        {data.url || 'No URL configured'}
+                    </div>
+                    <Handle type="source" position={Position.Bottom} className="!bg-indigo-500 !w-3 !h-3" />
+                </NodeWrapper>
+            );
+        });
+
+        const PopupVideoNode = memo(({ id, data, selected }) => {
+            const edges = useEdges();
+            const isTerminal = !edges.filter(e => e.source === id).some(e => e.data?.trigger === TriggerType.AT_END);
+            return (
+                <NodeWrapper selected={selected} title="Popup Video" icon={Video} colorClass="bg-pink-600" isTerminal={isTerminal}>
+                    <Handle type="target" position={Position.Top} className="!bg-pink-500 !w-3 !h-3" />
+                    <div className="text-xs text-gray-400">Popup URL</div>
+                    <div className="text-sm text-gray-200 truncate font-mono bg-gray-800 p-1.5 rounded border border-gray-700">
+                        {data.url || 'No URL configured'}
+                    </div>
+                    <Handle type="source" position={Position.Bottom} className="!bg-pink-500 !w-3 !h-3" />
+                </NodeWrapper>
+            );
+        });
+
+        const OptionsNode = memo(({ id, data, selected }) => {
+            const edges = useEdges();
+            const isTerminal = edges.filter(e => e.source === id).length === 0;
+            const isClearNotClear = data.optionType === 'CLEAR_NOT_CLEAR';
+            return (
+                <NodeWrapper selected={selected} title={`Options (${data.optionType})`} icon={HelpCircle} colorClass="bg-emerald-600" isTerminal={isTerminal}>
+                    <Handle type="target" position={Position.Top} className="!bg-emerald-500 !w-3 !h-3" />
+                    <div className="text-xs text-gray-400 mb-1">Question</div>
+                    <div className="text-sm font-medium text-white mb-3">{data.question || 'Define a question...'}</div>
+                    <div className="space-y-1">
+                        {(data.options || []).map((opt, idx) => (
+                            <div key={opt.id} className={`text-[10px] px-2 py-1 rounded flex justify-between items-center ${
+                                !isClearNotClear && data.correctOptionId === opt.id 
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' 
+                                : 'bg-gray-800 text-gray-400 border border-gray-700'
+                            }`}>
+                                <span>{String.fromCharCode(65 + idx)}. {opt.text || `Option ${idx + 1}`}</span>
+                                {!isClearNotClear && data.correctOptionId === opt.id && <span className="font-bold">✓</span>}
+                            </div>
+                        ))}
+                    </div>
+                    <Handle type="source" position={Position.Bottom} className="!bg-emerald-500 !w-3 !h-3" />
+                </NodeWrapper>
+            );
+        });
+
+        const ActionNode = memo(({ id, data, selected }) => {
+            const edges = useEdges();
+            const isTerminal = edges.filter(e => e.source === id).length === 0;
+            return (
+                <NodeWrapper selected={selected} title="Action" icon={PlayCircle} colorClass="bg-orange-600" isTerminal={isTerminal}>
+                    <Handle type="target" position={Position.Top} className="!bg-orange-500 !w-3 !h-3" />
+                    <div className="flex items-center gap-2 text-sm text-gray-200">
+                        <Settings2 size={14} className="text-gray-400" />
+                        <span>{data.actionType === 'resumePrimary' ? 'Resume Primary' : data.actionType === 'resumePopup' ? 'Resume Popup' : 'Custom'}</span>
+                    </div>
+                </NodeWrapper>
+            );
+        });
+
+        // --- Modals ---
+
+        const BaseModal = ({ title, onClose, children }) => (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md">
+                    <div className="flex items-center justify-between p-4 border-b border-gray-800">
+                        <h3 className="text-lg font-semibold text-white">{title}</h3>
+                        <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={20} /></button>
+                    </div>
+                    <div className="p-6">{children}</div>
+                </div>
+            </div>
+        );
+
+        const VideoConfigModal = ({ data, onSave, onClose }) => {
+            const [url, setUrl] = useState(data.url || '');
+            return (
+                <BaseModal title={`Configure ${data.label}`} onClose={onClose}>
+                    <div className="space-y-4">
+                        <label className="block text-sm text-gray-400">Video Source URL</label>
+                        <input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="w-full bg-gray-950 border border-gray-700 rounded p-3 text-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        <button onClick={() => { onSave({ ...data, url }); onClose(); }} className="w-full bg-indigo-600 hover:bg-indigo-500 py-2 rounded font-medium">Save</button>
+                    </div>
+                </BaseModal>
+            );
+        };
+
+        const OptionsConfigModal = ({ data, onSave, onClose }) => {
+            const [question, setQuestion] = useState(data.question || '');
+            const [options, setOptions] = useState(data.options || []);
+            const [correctId, setCorrectId] = useState(data.correctOptionId || '');
+            const isClearNotClear = data.optionType === 'CLEAR_NOT_CLEAR';
+
+            useEffect(() => {
+                if (options.length === 0) {
+                    if (isClearNotClear) {
+                        setOptions([{ id: 'c', text: 'Clear' }, { id: 'nc', text: 'Not Clear' }]);
+                    } else {
+                        const count = data.optionType === 'AB' ? 2 : data.optionType === 'ABC' ? 3 : 4;
+                        setOptions(Array.from({ length: count }, (_, i) => ({ id: `opt-${i}`, text: '' })));
+                    }
+                }
+            }, []);
+
+            return (
+                <BaseModal title="Configure Options" onClose={onClose}>
+                    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase font-bold">Question</label>
+                            <textarea value={question} onChange={e => setQuestion(e.target.value)} rows={2} className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white" />
+                        </div>
+                        {options.map((opt, i) => (
+                            <div key={opt.id} className="flex gap-2 items-center">
+                                <span className="w-6 text-xs font-bold text-gray-600">{String.fromCharCode(65 + i)}</span>
+                                <input type="text" value={opt.text} onChange={e => setOptions(options.map(o => o.id === opt.id ? { ...o, text: e.target.value } : o))} className="flex-1 bg-gray-950 border border-gray-700 rounded p-2 text-sm text-white" />
+                                {!isClearNotClear && (
+                                    <button onClick={() => setCorrectId(opt.id)} className={`p-2 rounded ${correctId === opt.id ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-500'}`}>
+                                        <CheckCircle2 size={16} />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        <button onClick={() => { onSave({ ...data, question, options, correctOptionId: correctId }); onClose(); }} className="w-full bg-emerald-600 py-2 rounded font-medium">Save Options</button>
+                    </div>
+                </BaseModal>
+            );
+        };
+
+        const ActionConfigModal = ({ data, onSave, onClose }) => {
+            const [type, setType] = useState(data.actionType || 'resumePrimary');
+            return (
+                <BaseModal title="Configure Action" onClose={onClose}>
+                    <div className="space-y-4">
+                        <select value={type} onChange={e => setType(e.target.value)} className="w-full bg-gray-950 border border-gray-700 rounded p-3 text-white">
+                            <option value="resumePrimary">Resume Primary Video</option>
+                            <option value="resumePopup">Resume Popup Video</option>
+                        </select>
+                        <button onClick={() => { onSave({ ...data, actionType: type }); onClose(); }} className="w-full bg-orange-600 py-2 rounded font-medium">Save</button>
+                    </div>
+                </BaseModal>
+            );
+        };
+
+        const EdgeConfigModal = ({ sourceNode, data, onSave, onClose }) => {
+            const isVideoSource = sourceNode?.type === 'primaryVideo' || sourceNode?.type === 'popupVideo';
+            const isOptionsSource = sourceNode?.type === 'options';
+            const isCNC = isOptionsSource && sourceNode?.data?.optionType === 'CLEAR_NOT_CLEAR';
+
+            const [trigger, setTrigger] = useState(data.trigger || (isVideoSource ? TriggerType.AT_END : TriggerType.DEFAULT));
+            const [time, setTime] = useState(data.time || '0');
+
+            const handleSave = () => {
+                let label = '';
+                if (trigger === TriggerType.AT_END) label = 'On End';
+                if (trigger === TriggerType.AT_TIME) label = `@ ${time}s`;
+                if (trigger === TriggerType.ON_CORRECT) label = 'Correct';
+                if (trigger === TriggerType.ON_WRONG) label = 'Wrong';
+                if (trigger === TriggerType.ON_CLEAR) label = 'Clear';
+                if (trigger === TriggerType.ON_NOT_CLEAR) label = 'Not Clear';
+
+                onSave({ trigger, time: trigger === TriggerType.AT_TIME ? parseFloat(time) : undefined, label });
+                onClose();
+            };
+
+            return (
+                <BaseModal title="Connection Logic" onClose={onClose}>
+                    <div className="space-y-4">
+                        {isVideoSource && (
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => setTrigger(TriggerType.AT_END)} className={`p-2 rounded border ${trigger === TriggerType.AT_END ? 'bg-blue-600 border-blue-400' : 'bg-gray-800 border-gray-700'}`}>At End</button>
+                                <button onClick={() => setTrigger(TriggerType.AT_TIME)} className={`p-2 rounded border ${trigger === TriggerType.AT_TIME ? 'bg-blue-600 border-blue-400' : 'bg-gray-800 border-gray-700'}`}>At Time</button>
+                            </div>
+                        )}
+                        {trigger === TriggerType.AT_TIME && <input type="number" step="0.1" value={time} onChange={e => setTime(e.target.value)} className="w-full bg-gray-950 border border-gray-700 rounded p-2" />}
+                        {isOptionsSource && !isCNC && (
+                             <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => setTrigger(TriggerType.ON_CORRECT)} className={`p-2 rounded border ${trigger === TriggerType.ON_CORRECT ? 'bg-emerald-600 border-emerald-400' : 'bg-gray-800 border-gray-700'}`}>Correct</button>
+                                <button onClick={() => setTrigger(TriggerType.ON_WRONG)} className={`p-2 rounded border ${trigger === TriggerType.ON_WRONG ? 'bg-red-600 border-red-400' : 'bg-gray-800 border-gray-700'}`}>Wrong</button>
+                            </div>
+                        )}
+                        {isCNC && (
+                             <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => setTrigger(TriggerType.ON_CLEAR)} className={`p-2 rounded border ${trigger === TriggerType.ON_CLEAR ? 'bg-emerald-600 border-emerald-400' : 'bg-gray-800 border-gray-700'}`}>If Clear</button>
+                                <button onClick={() => setTrigger(TriggerType.ON_NOT_CLEAR)} className={`p-2 rounded border ${trigger === TriggerType.ON_NOT_CLEAR ? 'bg-pink-600 border-pink-400' : 'bg-gray-800 border-gray-700'}`}>If Not Clear</button>
+                            </div>
+                        )}
+                        <button onClick={handleSave} className="w-full bg-white text-black py-2 rounded font-bold mt-4">Apply</button>
+                    </div>
+                </BaseModal>
+            );
+        };
+
+        // --- Sidebar ---
+
+        const SidebarItem = ({ type, subType, label, icon: Icon, color }) => {
+            const onDragStart = (e) => {
+                e.dataTransfer.setData('type', type);
+                if (subType) e.dataTransfer.setData('subtype', subType);
+                e.dataTransfer.effectAllowed = 'move';
+            };
+            return (
+                <div draggable onDragStart={onDragStart} className="flex items-center gap-3 p-3 bg-gray-800 border border-gray-700 rounded-lg cursor-grab hover:border-gray-500 transition-all group">
+                    <Icon size={18} className={`text-${color}-500`} />
+                    <span className="text-sm font-medium text-gray-200 flex-1">{label}</span>
+                    <GripVertical size={14} className="text-gray-600" />
+                </div>
+            );
+        };
+
+        const Sidebar = () => (
+            <aside className="w-64 border-r border-gray-800 bg-gray-900 flex flex-col h-full shrink-0">
+                <div className="p-4 border-b border-gray-800"><h2 className="text-xs font-bold text-gray-500 uppercase">Components</h2></div>
+                <div className="p-4 space-y-6 overflow-y-auto flex-1">
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-gray-600 uppercase">Media</p>
+                        <SidebarItem type={NodeType.PRIMARY_VIDEO} label="Primary Video" icon={Video} color="indigo" />
+                        <SidebarItem type={NodeType.POPUP_VIDEO} label="Popup Video" icon={Video} color="pink" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-gray-600 uppercase">Interactions</p>
+                        <SidebarItem type={NodeType.OPTIONS} subType="CLEAR_NOT_CLEAR" label="Self Assess" icon={CheckCircle} color="emerald" />
+                        <SidebarItem type={NodeType.OPTIONS} subType="AB" label="Quiz (A/B)" icon={HelpCircle} color="emerald" />
+                        <SidebarItem type={NodeType.OPTIONS} subType="ABCD" label="Quiz (A/B/C/D)" icon={HelpCircle} color="emerald" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-gray-600 uppercase">Flow Controls</p>
+                        <SidebarItem type={NodeType.ACTION} label="Resume Node" icon={PlayCircle} color="orange" />
+                    </div>
+                </div>
+            </aside>
+        );
+
+        // --- Main Flow Editor ---
+
+        const FlowEditor = () => {
+            const [nodes, setNodes, onNodesChange] = useNodesState([]);
+            const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+            const [reactFlowInstance, setReactFlowInstance] = useState(null);
+            const [editingNode, setEditingNode] = useState(null);
+            const [editingEdge, setEditingEdge] = useState(null);
+
+            const nodeTypes = useMemo(() => ({
+                [NodeType.PRIMARY_VIDEO]: PrimaryVideoNode,
+                [NodeType.POPUP_VIDEO]: PopupVideoNode,
+                [NodeType.OPTIONS]: OptionsNode,
+                [NodeType.ACTION]: ActionNode,
+            }), []);
+
+            const onConnect = useCallback((params) => {
+                const newEdge = { 
+                    ...params, 
+                    id: `e${params.source}-${params.target}`, 
+                    animated: true,
+                    data: { trigger: TriggerType.DEFAULT },
+                    label: ''
+                };
+                setEdges(eds => addEdge(newEdge, eds));
+                setEditingEdge(newEdge);
+            }, [setEdges]);
+
+            const onDrop = useCallback((e) => {
+                e.preventDefault();
+                if (!reactFlowInstance) return;
+                const type = e.dataTransfer.getData('type');
+                const subType = e.dataTransfer.getData('subtype');
+                if (!type) return;
+
+                const position = reactFlowInstance.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+                const newNode = {
+                    id: getNextId(),
+                    type,
+                    position,
+                    data: { 
+                        label: type,
+                        ...(type === NodeType.OPTIONS ? { options: [], optionType: subType } : {}),
+                        ...(type === NodeType.ACTION ? { actionType: 'resumePrimary' } : {}),
+                    }
+                };
+                setNodes(nds => nds.concat(newNode));
+                setEditingNode(newNode);
+            }, [reactFlowInstance, setNodes]);
+
+            const handleNodeSave = (updated) => {
+                setNodes(nds => nds.map(n => n.id === editingNode.id ? { ...n, data: updated } : n));
+                toast.success('Node updated');
+            };
+
+            const handleEdgeSave = (updated) => {
+                setEdges(eds => eds.map(e => e.id === editingEdge.id ? { ...e, data: updated, label: updated.label } : e));
+                toast.success('Path logic updated');
+            };
+
+            const exportFlow = () => {
+                const json = buildFlowJson(nodes, edges);
+                const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `flow-designer-${Date.now()}.json`;
+                a.click();
+                toast.success('JSON Downloaded');
+            };
+
+            const handleCopyJson = useCallback(() => {
+                try {
+                    const json = JSON.stringify(buildFlowJson(nodes, edges), null, 2);
+                    // Use standard fallback for iframe environments where Clipboard API might be blocked
+                    const textArea = document.createElement("textarea");
+                    textArea.value = json;
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    textArea.style.top = "0";
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        toast.success('Copied to clipboard!');
+                    } catch (err) {
+                        toast.error('Unable to copy');
+                    }
+                    document.body.removeChild(textArea);
+                } catch (err) {
+                    toast.error('Failed to generate JSON');
+                }
+            }, [nodes, edges]);
+
+            return (
+                <div className="flex h-full w-full">
+                    <Sidebar />
+                    <div className="flex-1 relative bg-gray-950" onDrop={onDrop} onDragOver={e => e.preventDefault()}>
+                        <ReactFlow
+                            nodes={nodes}
+                            edges={edges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onConnect={onConnect}
+                            onInit={setReactFlowInstance}
+                            nodeTypes={nodeTypes}
+                            onNodeClick={(_, node) => setEditingNode(node)}
+                            onEdgeClick={(_, edge) => setEditingEdge(edge)}
+                            fitView
+                        >
+                            <Background color="#1f2937" gap={20} />
+                            <Controls />
+                            <Panel position="top-right" className="flex gap-2">
+                                <button onClick={() => { setNodes([]); setEdges([]); }} className="bg-gray-800 hover:bg-red-900/40 p-2 rounded border border-gray-700 text-gray-400 hover:text-red-200 transition-colors"><Trash2 size={16} /></button>
+                                <button onClick={handleCopyJson} className="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded border border-gray-700 text-xs font-bold flex items-center gap-2"><Copy size={14} /> Copy</button>
+                                <button onClick={exportFlow} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded text-xs font-bold flex items-center gap-2 shadow-lg"><Download size={14} /> Export</button>
+                            </Panel>
+                        </ReactFlow>
+
+                        {editingNode?.type?.includes('Video') && <VideoConfigModal data={editingNode.data} onSave={handleNodeSave} onClose={() => setEditingNode(null)} />}
+                        {editingNode?.type === NodeType.OPTIONS && <OptionsConfigModal data={editingNode.data} onSave={handleNodeSave} onClose={() => setEditingNode(null)} />}
+                        {editingNode?.type === NodeType.ACTION && <ActionConfigModal data={editingNode.data} onSave={handleNodeSave} onClose={() => setEditingNode(null)} />}
+                        {editingEdge && <EdgeConfigModal sourceNode={nodes.find(n => n.id === editingEdge.source)} data={editingEdge.data} onSave={handleEdgeSave} onClose={() => setEditingEdge(null)} />}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Root App ---
+
+        const App = () => (
+            <div className="w-screen h-screen flex flex-col overflow-hidden">
+                <header className="h-14 border-b border-gray-800 bg-gray-900 flex items-center px-6 justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                            <Video size={18} className="text-white" />
+                        </div>
+                        <h1 className="text-lg font-bold text-gray-100">Adaptive Video Designer</h1>
+                    </div>
+                    <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Studio Engine v1.0</div>
+                </header>
+                <main className="flex-1 overflow-hidden">
+                    <ReactFlowProvider>
+                        <FlowEditor />
+                    </ReactFlowProvider>
+                </main>
+                <Toaster position="bottom-right" toastOptions={{ style: { background: '#111827', color: '#fff', border: '1px solid #374151' } }} />
+            </div>
+        );
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

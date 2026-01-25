@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chapter Selection</title>
+    <!-- Firebase SDKs (compat version to match index.html) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .add-btn-main {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #28a745;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            border: none;
+        }
+        .add-btn-main:hover {
+            background: #218838;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .chapter-input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        #chapterInputsList {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 5px;
+            border: 1px inset #eee;
+        }
+        .selection-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .btn {
+            padding: 12px 24px;
+            font-size: 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+            transform: translateY(-2px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .list-container {
+            margin-top: 20px;
+        }
+        .list-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-radius: 4px;
+        }
+        .list-item:hover {
+            background-color: #f0f8ff;
+        }
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        .chapter-item {
+            padding: 10px;
+            margin-left: 20px;
+            border-left: 3px solid #007bff;
+            background: #fff;
+            margin-bottom: 5px;
+            border-radius: 0 4px 4px 0;
+        }
+        .back-btn {
+            margin-bottom: 20px;
+            display: none;
+            cursor: pointer;
+            color: #007bff;
+            font-weight: bold;
+        }
+        h2, h3 {
+            color: #2c3e50;
+        }
+        #loading {
+            text-align: center;
+            display: none;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Integral Web Chapters</h1>
+    </div>
+
+    <div id="classSelection" class="selection-buttons">
+        <button class="btn" onclick="fetchChapters('chapterList_class11', 'Class 11')">Class 11</button>
+        <button class="btn" onclick="fetchChapters('chapterList_class12', 'Class 12')">Class 12</button>
+    </div>
+
+    <div id="backButton" class="back-btn" onclick="showClassSelection()">← Back to Class Selection</div>
+    <div id="docBackButton" class="back-btn" onclick="showDocList()">← Back to Subjects</div>
+    <div id="topicBackButton" class="back-btn" onclick="showChapterList()">← Back to Chapters</div>
+    <div id="subtopicBackButton" class="back-btn" onclick="showTopicList()">← Back to Topics</div>
+
+    <h2 id="viewTitle">Select a Class</h2>
+    <div style="position: relative;">
+        <button id="addSubjectBtn" class="add-btn-main" onclick="openAddSubjectModal()">+</button>
+        <button id="addChapterBtn" class="add-btn-main" onclick="openAddChapterModal()">+</button>
+        <button id="addTopicBtn" class="add-btn-main" onclick="openAddTopicModal()">+</button>
+        <button id="addSubtopicBtn" class="add-btn-main" onclick="openAddSubtopicModal()">+</button>
+    </div>
+    
+    <div id="loading">Loading...</div>
+    <div id="contentList" class="list-container"></div>
+</div>
+
+<!-- Add Subject Modal -->
+<div id="addSubjectModal" class="modal">
+    <div class="modal-content">
+        <h3>Add New Subject</h3>
+        <div class="form-group">
+            <label>Subject Name</label>
+            <input type="text" id="newSubjectName" placeholder="e.g. Physics">
+        </div>
+        <div class="form-group">
+            <label>Chapters</label>
+            <div id="chapterInputsList">
+                <div class="chapter-input-row">
+                    <input type="text" class="chapter-input" placeholder="Chapter Name">
+                </div>
+            </div>
+            <button class="btn" style="padding: 5px 10px; font-size: 14px; background-color: #6c757d;" onclick="addChapterInput()">+ Add Another Chapter</button>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" style="background-color: #6c757d;" onclick="closeAddSubjectModal()">Cancel</button>
+            <button class="btn" onclick="saveSubject()">Save Subject</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Chapter Modal -->
+<div id="addChapterModal" class="modal">
+    <div class="modal-content">
+        <h3>Add New Chapter</h3>
+        <div class="form-group">
+            <label>Chapter Name</label>
+            <input type="text" id="newChapterName" placeholder="e.g. Differentiation">
+        </div>
+        <div class="modal-footer">
+            <button class="btn" style="background-color: #6c757d;" onclick="closeAddChapterModal()">Cancel</button>
+            <button class="btn" onclick="saveChapter()">Save Chapter</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Topic Modal -->
+<div id="addTopicModal" class="modal">
+    <div class="modal-content">
+        <h3>Add New Topic</h3>
+        <div class="form-group">
+            <label>Topic Name</label>
+            <input type="text" id="newTopicName" placeholder="e.g. Chain Rule">
+        </div>
+        <div class="modal-footer">
+            <button class="btn" style="background-color: #6c757d;" onclick="closeAddTopicModal()">Cancel</button>
+            <button class="btn" onclick="saveTopic()">Save Topic</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Subtopic Modal -->
+<div id="addSubtopicModal" class="modal">
+    <div class="modal-content">
+        <h3>Add New Subtopic</h3>
+        <div class="form-group">
+            <label>Subtopic Name</label>
+            <input type="text" id="newSubtopicName" placeholder="e.g. Product Rule">
+        </div>
+        <div class="modal-footer">
+            <button class="btn" style="background-color: #6c757d;" onclick="closeAddSubtopicModal()">Cancel</button>
+            <button class="btn" onclick="saveSubtopic()">Save Subtopic</button>
+        </div>
+    </div>
+</div>
+
+<!-- Subtopic JSON Editor Modal -->
+<div id="subtopicJsonModal" class="modal">
+    <div class="modal-content">
+        <h3 id="subtopicJsonTitle">Edit Subtopic JSON</h3>
+        <div class="form-group">
+            <label>Already Present (read-only)</label>
+            <textarea id="subtopicExistingJsonTextarea" style="width: 100%; height: 180px; font-family: monospace;" readonly></textarea>
+        </div>
+        <div class="form-group">
+            <label>New Addition (will be merged)</label>
+            <textarea id="subtopicNewJsonTextarea" style="width: 100%; height: 180px; font-family: monospace;"></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" style="background-color: #6c757d;" onclick="closeSubtopicJsonModal()">Cancel</button>
+            <button class="btn" onclick="saveSubtopicJson()">Save JSON</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Firebase Config (Copied from index.html)
+    const firebaseConfig = {
+        apiKey: "AIzaSyDNqfRczOHTukGdXDnuzVXjbL7P5blnyAo",
+        authDomain: "dbydx-ea226.firebaseapp.com",
+        projectId: "dbydx-ea226",
+        storageBucket: "dbydx-ea226.firebasestorage.app",
+        messagingSenderId: "329650707379",
+        appId: "1:329650707379:web:18bab2bab403e1004b89c6",
+        measurementId: "G-2F7YVE2X94",
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let currentCollection = '';
+    let currentClassName = '';
+    let currentDocs = [];
+    let currentDocId = '';
+    let currentDocData = null;
+    let currentChapterNameString = '';
+    let currentTopicNameString = '';
+    let currentSubtopicDocId = '';
+    let currentSubtopicLabel = '';
+
+    async function fetchChapters(collectionName, className) {
+        currentCollection = collectionName;
+        currentClassName = className;
+        
+        const contentList = document.getElementById('contentList');
+        const viewTitle = document.getElementById('viewTitle');
+        const loading = document.getElementById('loading');
+        const classSelection = document.getElementById('classSelection');
+        const backButton = document.getElementById('backButton');
+        const addSubjectBtn = document.getElementById('addSubjectBtn');
+        const addChapterBtn = document.getElementById('addChapterBtn');
+        const addTopicBtn = document.getElementById('addTopicBtn');
+        const addSubtopicBtn = document.getElementById('addSubtopicBtn');
+
+        // UI Updates
+        classSelection.style.display = 'none';
+        backButton.style.display = 'block';
+        addSubjectBtn.style.display = 'flex';
+        addChapterBtn.style.display = 'none';
+        addTopicBtn.style.display = 'none';
+        addSubtopicBtn.style.display = 'none';
+        viewTitle.innerText = `Subjects (${className})`;
+        contentList.innerHTML = '';
+        loading.style.display = 'block';
+
+        try {
+            const querySnapshot = await db.collection(collectionName).get();
+            loading.style.display = 'none';
+            
+            if (querySnapshot.empty) {
+                contentList.innerHTML = '<p>No documents found in this collection.</p>';
+                return;
+            }
+
+            currentDocs = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                currentDocs.push({ id: doc.id, ...data });
+                
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                // Use a display name if available, otherwise use doc ID
+                div.innerText = data.name || data.title || doc.id;
+                div.onclick = () => showDocumentDetails(doc.id, data);
+                contentList.appendChild(div);
+            });
+        } catch (error) {
+            console.error("Error fetching documents: ", error);
+            loading.style.display = 'none';
+            contentList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+    }
+
+    function showDocumentDetails(docId, data) {
+        currentDocId = docId;
+        currentDocData = data;
+        const contentList = document.getElementById('contentList');
+        const viewTitle = document.getElementById('viewTitle');
+        const backButton = document.getElementById('backButton');
+        const docBackButton = document.getElementById('docBackButton');
+        const topicBackButton = document.getElementById('topicBackButton');
+        const addSubjectBtn = document.getElementById('addSubjectBtn');
+        const addChapterBtn = document.getElementById('addChapterBtn');
+        const addTopicBtn = document.getElementById('addTopicBtn');
+        const addSubtopicBtn = document.getElementById('addSubtopicBtn');
+
+        backButton.style.display = 'none';
+        docBackButton.style.display = 'block';
+        topicBackButton.style.display = 'none';
+        addSubjectBtn.style.display = 'none';
+        addChapterBtn.style.display = 'flex';
+        addTopicBtn.style.display = 'none';
+        addSubtopicBtn.style.display = 'none';
+        const subjectName = data.name || data.title || docId;
+        viewTitle.innerText = `Chapters - ${subjectName}`;
+        contentList.innerHTML = '';
+
+        if (data.chapters && Array.isArray(data.chapters)) {
+            data.chapters.forEach((chapter, index) => {
+                const chapterNameString = typeof chapter === 'string' ? chapter : (chapter.name || chapter.title || `Chapter ${index + 1}`);
+                const div = document.createElement('div');
+                div.className = 'chapter-item list-item'; // Added list-item class for pointer cursor
+                div.innerText = chapterNameString;
+                div.onclick = () => fetchTopics(chapterNameString);
+                contentList.appendChild(div);
+            });
+        } else {
+            contentList.innerHTML = '<p>No chapters found in this document.</p>';
+        }
+    }
+
+    async function fetchTopics(chapterNameString) {
+        currentChapterNameString = chapterNameString;
+        const chapterName = chapterNameString.trim().toLowerCase().replace(/\s+/g, '_');
+        const contentList = document.getElementById('contentList');
+        const viewTitle = document.getElementById('viewTitle');
+        const docBackButton = document.getElementById('docBackButton');
+        const topicBackButton = document.getElementById('topicBackButton');
+        const loading = document.getElementById('loading');
+        const addChapterBtn = document.getElementById('addChapterBtn');
+        const addTopicBtn = document.getElementById('addTopicBtn');
+        const addSubtopicBtn = document.getElementById('addSubtopicBtn');
+
+        docBackButton.style.display = 'none';
+        topicBackButton.style.display = 'block';
+        addChapterBtn.style.display = 'none';
+        addTopicBtn.style.display = 'flex';
+        addSubtopicBtn.style.display = 'none';
+        viewTitle.innerText = `Topics - ${chapterNameString}`;
+        contentList.innerHTML = '';
+        loading.style.display = 'block';
+
+        try {
+            const docRef = db.collection('topics').doc(chapterName);
+            const doc = await docRef.get();
+            loading.style.display = 'none';
+
+            if (!doc.exists) {
+                contentList.innerHTML = `<p>No topics found for chapter: ${chapterName}</p>`;
+                return;
+            }
+
+            const data = doc.data();
+            if (data.topic && Array.isArray(data.topic)) {
+                data.topic.forEach((topicItem, index) => {
+                    const topicNameString = typeof topicItem === 'string' ? topicItem : (topicItem.name || topicItem.title || `Topic ${index + 1}`);
+                    const div = document.createElement('div');
+                    div.className = 'chapter-item list-item'; // Added list-item for clickability
+                    div.innerText = topicNameString;
+                    div.onclick = () => fetchSubtopics(topicNameString);
+                    contentList.appendChild(div);
+                });
+            } else {
+                contentList.innerHTML = '<p>No topics array found in the document.</p>';
+            }
+        } catch (error) {
+            console.error("Error fetching topics: ", error);
+            loading.style.display = 'none';
+            contentList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+    }
+
+    async function fetchSubtopics(topicNameString) {
+        currentTopicNameString = topicNameString;
+        const chapterNameFormatted = currentChapterNameString.trim().toLowerCase().replace(/\s+/g, '_');
+        const topicNameFormatted = topicNameString.trim().toLowerCase().replace(/\s+/g, '_');
+        const subtopicDocName = `${chapterNameFormatted}_${topicNameFormatted}`;
+
+        const contentList = document.getElementById('contentList');
+        const viewTitle = document.getElementById('viewTitle');
+        const topicBackButton = document.getElementById('topicBackButton');
+        const subtopicBackButton = document.getElementById('subtopicBackButton');
+        const loading = document.getElementById('loading');
+        const addTopicBtn = document.getElementById('addTopicBtn');
+        const addSubtopicBtn = document.getElementById('addSubtopicBtn');
+
+        topicBackButton.style.display = 'none';
+        subtopicBackButton.style.display = 'block';
+        addTopicBtn.style.display = 'none';
+        addSubtopicBtn.style.display = 'flex';
+        viewTitle.innerText = `Subtopics - ${topicNameString}`;
+        contentList.innerHTML = '';
+        loading.style.display = 'block';
+
+        try {
+            const querySnapshot = await db
+                .collection('subtopics')
+                .doc(subtopicDocName)
+                .collection('subtopiclist')
+                .get();
+            loading.style.display = 'none';
+
+            if (querySnapshot.empty) {
+                contentList.innerHTML = `<p>No subtopics found for: ${subtopicDocName}</p>`;
+                return;
+            }
+
+            let index = 0;
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                const subtopicLabel = data.name || data.title || doc.id || `Subtopic ${index + 1}`;
+                const div = document.createElement('div');
+                div.className = 'chapter-item';
+                div.innerText = subtopicLabel;
+                div.onclick = () => openSubtopicJsonEditor(doc.id, subtopicLabel);
+                contentList.appendChild(div);
+                index++;
+            });
+        } catch (error) {
+            console.error("Error fetching subtopics: ", error);
+            loading.style.display = 'none';
+            contentList.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+    }
+
+    function showClassSelection() {
+        document.getElementById('classSelection').style.display = 'flex';
+        document.getElementById('backButton').style.display = 'none';
+        document.getElementById('docBackButton').style.display = 'none';
+        document.getElementById('topicBackButton').style.display = 'none';
+        document.getElementById('subtopicBackButton').style.display = 'none';
+        document.getElementById('addSubjectBtn').style.display = 'none';
+        document.getElementById('addChapterBtn').style.display = 'none';
+        document.getElementById('addTopicBtn').style.display = 'none';
+        document.getElementById('addSubtopicBtn').style.display = 'none';
+        document.getElementById('viewTitle').innerText = 'Select a Class';
+        document.getElementById('contentList').innerHTML = '';
+    }
+
+    function showDocList() {
+        document.getElementById('docBackButton').style.display = 'none';
+        document.getElementById('topicBackButton').style.display = 'none';
+        document.getElementById('subtopicBackButton').style.display = 'none';
+        document.getElementById('addSubjectBtn').style.display = 'flex';
+        document.getElementById('addChapterBtn').style.display = 'none';
+        document.getElementById('addTopicBtn').style.display = 'none';
+        document.getElementById('addSubtopicBtn').style.display = 'none';
+        fetchChapters(currentCollection, currentClassName);
+    }
+
+    function showChapterList() {
+        document.getElementById('topicBackButton').style.display = 'none';
+        document.getElementById('subtopicBackButton').style.display = 'none';
+        document.getElementById('addSubjectBtn').style.display = 'none'; 
+        document.getElementById('addChapterBtn').style.display = 'flex';
+        document.getElementById('addTopicBtn').style.display = 'none';
+        document.getElementById('addSubtopicBtn').style.display = 'none';
+        showDocumentDetails(currentDocId, currentDocData);
+    }
+
+    function showTopicList() {
+        document.getElementById('subtopicBackButton').style.display = 'none';
+        document.getElementById('addTopicBtn').style.display = 'flex';
+        document.getElementById('addSubtopicBtn').style.display = 'none';
+        fetchTopics(currentChapterNameString);
+    }
+
+    // Modal Logic
+    function openAddSubjectModal() {
+        document.getElementById('addSubjectModal').style.display = 'block';
+        document.getElementById('newSubjectName').value = '';
+        document.getElementById('chapterInputsList').innerHTML = `
+            <div class="chapter-input-row">
+                <input type="text" class="chapter-input" placeholder="Chapter Name">
+            </div>
+        `;
+    }
+
+    function closeAddSubjectModal() {
+        document.getElementById('addSubjectModal').style.display = 'none';
+    }
+
+    function addChapterInput() {
+        const list = document.getElementById('chapterInputsList');
+        const div = document.createElement('div');
+        div.className = 'chapter-input-row';
+        div.innerHTML = '<input type="text" class="chapter-input" placeholder="Chapter Name">';
+        list.appendChild(div);
+    }
+
+    async function saveSubject() {
+        const subjectName = document.getElementById('newSubjectName').value.trim();
+        if (!subjectName) {
+            alert('Please enter a subject name');
+            return;
+        }
+
+        const chapterInputs = document.querySelectorAll('.chapter-input');
+        const chapters = [];
+        chapterInputs.forEach(input => {
+            const val = input.value.trim();
+            if (val) chapters.push(val);
+        });
+
+        const loading = document.getElementById('loading');
+        loading.style.display = 'block';
+        closeAddSubjectModal();
+
+        try {
+            // Using subject name as document ID
+            await db.collection(currentCollection).doc(subjectName).set({
+                name: subjectName,
+                chapters: chapters
+            });
+            alert('Subject added successfully!');
+            fetchChapters(currentCollection, currentClassName); // Refresh list
+        } catch (error) {
+            console.error("Error saving subject: ", error);
+            alert("Error saving subject: " + error.message);
+            loading.style.display = 'none';
+        }
+    }
+
+    // Chapter Modal Logic
+    function openAddChapterModal() {
+        document.getElementById('addChapterModal').style.display = 'block';
+        document.getElementById('newChapterName').value = '';
+    }
+
+    function closeAddChapterModal() {
+        document.getElementById('addChapterModal').style.display = 'none';
+    }
+
+    async function saveChapter() {
+        const chapterName = document.getElementById('newChapterName').value.trim();
+        if (!chapterName) {
+            alert('Please enter a chapter name');
+            return;
+        }
+
+        const loading = document.getElementById('loading');
+        loading.style.display = 'block';
+        closeAddChapterModal();
+
+        try {
+            const docRef = db.collection(currentCollection).doc(currentDocId);
+            await docRef.update({
+                chapters: firebase.firestore.FieldValue.arrayUnion(chapterName)
+            });
+            
+            alert('Chapter added successfully!');
+            
+            // Refresh the current document data to show the new chapter
+            const updatedDoc = await docRef.get();
+            showDocumentDetails(currentDocId, updatedDoc.data());
+            
+        } catch (error) {
+            console.error("Error saving chapter: ", error);
+            alert("Error saving chapter: " + error.message);
+            loading.style.display = 'none';
+        }
+    }
+
+    // Topic Modal Logic
+    function openAddTopicModal() {
+        document.getElementById('addTopicModal').style.display = 'block';
+        document.getElementById('newTopicName').value = '';
+    }
+
+    function closeAddTopicModal() {
+        document.getElementById('addTopicModal').style.display = 'none';
+    }
+
+    async function saveTopic() {
+        const topicName = document.getElementById('newTopicName').value.trim();
+        if (!topicName) {
+            alert('Please enter a topic name');
+            return;
+        }
+
+        const chapterNameFormatted = currentChapterNameString.trim().toLowerCase().replace(/\s+/g, '_');
+        const loading = document.getElementById('loading');
+        loading.style.display = 'block';
+        closeAddTopicModal();
+
+        try {
+            const docRef = db.collection('topics').doc(chapterNameFormatted);
+            const doc = await docRef.get();
+
+            if (doc.exists) {
+                // Update existing document
+                await docRef.update({
+                    topic: firebase.firestore.FieldValue.arrayUnion(topicName)
+                });
+            } else {
+                // Create new document if it doesn't exist
+                await docRef.set({
+                    topic: [topicName]
+                });
+            }
+            
+            alert('Topic added successfully!');
+            fetchTopics(currentChapterNameString); // Refresh the topics list
+            
+        } catch (error) {
+            console.error("Error saving topic: ", error);
+            alert("Error saving topic: " + error.message);
+            loading.style.display = 'none';
+        }
+    }
+
+    // Subtopic Modal Logic
+    function openAddSubtopicModal() {
+        document.getElementById('addSubtopicModal').style.display = 'block';
+        document.getElementById('newSubtopicName').value = '';
+    }
+
+    function closeAddSubtopicModal() {
+        document.getElementById('addSubtopicModal').style.display = 'none';
+    }
+
+    async function saveSubtopic() {
+        const subtopicName = document.getElementById('newSubtopicName').value.trim();
+        if (!subtopicName) {
+            alert('Please enter a subtopic name');
+            return;
+        }
+
+        const chapterNameFormatted = currentChapterNameString.trim().toLowerCase().replace(/\s+/g, '_');
+        const topicNameFormatted = currentTopicNameString.trim().toLowerCase().replace(/\s+/g, '_');
+        const subtopicDocName = `${chapterNameFormatted}_${topicNameFormatted}`;
+        const loading = document.getElementById('loading');
+        loading.style.display = 'block';
+        closeAddSubtopicModal();
+
+        try {
+            // Create a separate document for each subtopic under subtopics/{parentKey}/subtopiclist
+            await db
+                .collection('subtopics')
+                .doc(subtopicDocName)
+                .collection('subtopiclist')
+                .add({
+                    name: subtopicName
+                });
+            
+            alert('Subtopic added successfully!');
+            fetchSubtopics(currentTopicNameString); // Refresh the subtopics list
+            
+        } catch (error) {
+            console.error("Error saving subtopic: ", error);
+            alert("Error saving subtopic: " + error.message);
+            loading.style.display = 'none';
+        }
+    }
+
+    function openSubtopicJsonEditor(subtopicId, subtopicLabel) {
+        currentSubtopicDocId = subtopicId;
+        currentSubtopicLabel = subtopicLabel;
+
+        const modal = document.getElementById('subtopicJsonModal');
+        const existingTextarea = document.getElementById('subtopicExistingJsonTextarea');
+        const newTextarea = document.getElementById('subtopicNewJsonTextarea');
+        const title = document.getElementById('subtopicJsonTitle');
+        const loading = document.getElementById('loading');
+
+        title.innerText = `Edit JSON - ${subtopicLabel}`;
+        modal.style.display = 'block';
+        existingTextarea.value = '';
+        newTextarea.value = '';
+        loading.style.display = 'block';
+
+        (async () => {
+            try {
+                const chapterNameFormatted = currentChapterNameString.trim().toLowerCase().replace(/\s+/g, '_');
+                const topicNameFormatted = currentTopicNameString.trim().toLowerCase().replace(/\s+/g, '_');
+                const subtopicDocName = `${chapterNameFormatted}_${topicNameFormatted}`;
+
+                const docRef = db
+                    .collection('subtopics')
+                    .doc(subtopicDocName)
+                    .collection('subtopiclist')
+                    .doc(subtopicId);
+
+                const doc = await docRef.get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data) {
+                        existingTextarea.value = JSON.stringify(data, null, 2);
+                    } else {
+                        existingTextarea.value = '';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading subtopic JSON: ', error);
+                alert('Error loading JSON: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        })();
+    }
+
+    function closeSubtopicJsonModal() {
+        document.getElementById('subtopicJsonModal').style.display = 'none';
+    }
+
+    async function saveSubtopicJson() {
+        const newTextarea = document.getElementById('subtopicNewJsonTextarea');
+        const text = newTextarea.value.trim();
+        if (!text) {
+            alert('Please enter JSON to merge');
+            return;
+        }
+        let jsonData;
+
+        try {
+            jsonData = JSON.parse(text);
+        } catch (e) {
+            alert('Invalid JSON: ' + e.message);
+            return;
+        }
+
+        const loading = document.getElementById('loading');
+        loading.style.display = 'block';
+
+        try {
+            const chapterNameFormatted = currentChapterNameString.trim().toLowerCase().replace(/\s+/g, '_');
+            const topicNameFormatted = currentTopicNameString.trim().toLowerCase().replace(/\s+/g, '_');
+            const subtopicDocName = `${chapterNameFormatted}_${topicNameFormatted}`;
+
+            const docRef = db
+                .collection('subtopics')
+                .doc(subtopicDocName)
+                .collection('subtopiclist')
+                .doc(currentSubtopicDocId);
+
+            await docRef.set(jsonData, { merge: true });
+
+            alert('JSON saved successfully!');
+            closeSubtopicJsonModal();
+        } catch (error) {
+            console.error('Error saving JSON: ', error);
+            alert('Error saving JSON: ' + error.message);
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+</script>
+
+</body>
+</html>
