@@ -1,87 +1,131 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <title>Firebase Google Auth</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
-
     <style>
       body {
-        font-family: Arial, sans-serif;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         display: flex;
-        height: 100vh;
+        min-height: 100vh;
         justify-content: center;
         align-items: center;
-        background: #f5f5f5;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        margin: 0;
+        color: #333;
       }
       .card {
-        background: white;
-        padding: 30px;
-        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 40px;
+        border-radius: 16px;
         text-align: center;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        max-width: 500px;
+        width: 90%;
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
       }
-      button {
-        padding: 12px 20px;
+      h2 {
+        margin-bottom: 20px;
+        color: #2d3748;
+      }
+      .btn {
+        padding: 12px 24px;
         font-size: 16px;
         cursor: pointer;
-        margin: 5px;
+        border: none;
+        border-radius: 8px;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+        font-weight: 600;
+        margin: 8px;
+        display: inline-block;
+        text-decoration: none;
       }
-      textarea {
-        width: 100%;
-        height: 200px;
-        padding: 10px;
-        font-family: monospace;
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+      .btn-primary {
+        background-color: #4299e1;
+        color: white;
+      }
+      .btn-success {
+        background-color: #48bb78;
+        color: white;
+      }
+      .btn-warning {
+        background-color: #ed8936;
+        color: white;
+      }
+      .btn-info {
+        background-color: #ecc94b;
+        color: #2d3748;
+      }
+      .btn-danger {
+        background-color: #f56565;
+        color: white;
+      }
+      .btn-google {
+        background-color: #fff;
+        color: #757575;
         border: 1px solid #ddd;
-        border-radius: 4px;
-        margin: 10px 0;
-        box-sizing: border-box;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
       }
-      #uploadContainer {
-        margin-top: 30px;
-        padding-top: 30px;
-        border-top: 1px solid #ddd;
+
+      .nav-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin: 30px 0;
       }
-      img {
+
+      #userInfo {
+        margin: 20px 0;
+        padding: 15px;
+        background: #f7fafc;
+        border-radius: 8px;
+      }
+      #userInfo img {
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
         margin-top: 10px;
+        border: 3px solid white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
     </style>
   </head>
   <body>
     <div class="card">
-      <h2>Google Login</h2>
+      <h2>Integral Web Admin</h2>
 
-
-      <button id="loginBtn">Sign in with Google</button>
-      <button id="logoutBtn" style="display: none">Logout</button>
-
-
-      <div id="userInfo"></div>
-
-      <div style="margin-top: 20px;">
-        <a href="chapter.html"><button style="background-color: #28a745; color: white; border: none; border-radius: 4px;">Go to Chapter List</button></a>
+      <div id="authSection">
+        <button id="loginBtn" class="btn btn-google">
+          Sign in with Google
+        </button>
+        <div id="userInfo"></div>
+        <button id="logoutBtn" class="btn btn-danger" style="display: none">
+          Logout
+        </button>
       </div>
 
-
-      <div id="uploadContainer" style="display: none">
-        <h3>Upload JSON to Firestore</h3>
-        <textarea
-          id="jsonInput"
-          placeholder="Paste your JSON here..."
-        ></textarea>
-        <button id="uploadBtn">Upload to Firestore</button>
-        <div id="uploadStatus"></div>
+      <div class="nav-grid">
+        <a href="chapter.html" class="btn btn-success">Add Data</a>
+        <a href="designer2.html" class="btn btn-warning">Json Design</a>
+        <a href="hyperlink.html" class="btn btn-info">Hyperlink</a>
       </div>
     </div>
-
 
     <script>
       // 🔴 PASTE YOUR FIREBASE CONFIG HERE
@@ -95,78 +139,40 @@
         measurementId: "G-2F7YVE2X94",
       };
 
-
       // Initialize Firebase
       firebase.initializeApp(firebaseConfig);
-
 
       const auth = firebase.auth();
       const provider = new firebase.auth.GoogleAuthProvider();
       const db = firebase.firestore();
 
-
       const loginBtn = document.getElementById("loginBtn");
       const logoutBtn = document.getElementById("logoutBtn");
       const userInfo = document.getElementById("userInfo");
-      const uploadContainer = document.getElementById("uploadContainer");
-      const uploadBtn = document.getElementById("uploadBtn");
-      const jsonInput = document.getElementById("jsonInput");
-      const uploadStatus = document.getElementById("uploadStatus");
-
-
-      uploadBtn.onclick = async () => {
-        const jsonText = jsonInput.value.trim();
-        if (!jsonText) {
-          uploadStatus.innerHTML =
-            '<p style="color: red;">Please paste JSON first.</p>';
-          return;
-        }
-
-
-        try {
-          const jsonData = JSON.parse(jsonText);
-          await db.collection("test").doc("v1").set(jsonData);
-          uploadStatus.innerHTML =
-            '<p style="color: green;">✓ Successfully uploaded to Firestore!</p>';
-          jsonInput.value = "";
-        } catch (error) {
-          uploadStatus.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
-        }
-      };
-
 
       loginBtn.onclick = () => {
         auth.signInWithPopup(provider).catch((err) => alert(err.message));
       };
 
-
       logoutBtn.onclick = () => {
         auth.signOut();
       };
-
 
       auth.onAuthStateChanged((user) => {
         if (user) {
           loginBtn.style.display = "none";
           logoutBtn.style.display = "inline-block";
-          uploadContainer.style.display = "block";
-
 
           userInfo.innerHTML = `
-          <p><strong>${user.displayName}</strong></p>
-          <p>${user.email}</p>
+          <p>Logged in as: <strong>${user.email || "Anonymous User"}</strong></p>
           <img src="${user.photoURL}" width="80" />
         `;
         } else {
           loginBtn.style.display = "inline-block";
           logoutBtn.style.display = "none";
-          uploadContainer.style.display = "none";
           userInfo.innerHTML = "";
         }
       });
     </script>
   </body>
 </html>
-
-
-
