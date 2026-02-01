@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deep Link Generator</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 20px;
+        background-color: #f4f7f6;
+        color: #333;
+      }
+      .container {
+        max-width: 800px;
+        margin: auto;
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .selection-step {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #eee;
+        border-radius: 8px;
+        background: #fafafa;
+      }
+      .selection-step h3 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 16px;
+        color: #555;
+      }
+      /* List Styles */
+      .list-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .list-item {
+        padding: 12px 15px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 15px;
+      }
+      .list-item:hover {
+        background-color: #f0f0f0;
+        border-color: #bbb;
+      }
+      .list-item.selected {
+        background-color: #e3f2fd;
+        border-color: #2196f3;
+        color: #0d47a1;
+        font-weight: 500;
+      }
+      .list-item img {
+        max-width: 100%;
+        max-height: 150px;
+        margin-top: 8px;
+        display: block;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .result-container {
+        margin-top: 30px;
+        padding: 20px;
+        background: #e8f5e9;
+        border: 1px solid #c8e6c9;
+        border-radius: 8px;
+        display: none;
+      }
+      .url-box {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
+        font-family: monospace;
+        border: 1px solid #a5d6a7;
+        border-radius: 4px;
+        background: white;
+        word-break: break-all;
+        box-sizing: border-box;
+      }
+      .btn {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      .btn:hover {
+        background-color: #0056b3;
+      }
+      #loading {
+        text-align: center;
+        color: #666;
+        display: none;
+        margin: 10px 0;
+      }
+      .back-btn {
+        margin-bottom: 20px;
+        cursor: pointer;
+        color: #007bff;
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Deep Link Generator</h1>
+        <div id="currentUser" style="font-size: 14px; color: #666"></div>
+      </div>
+
+      <div id="loading">Loading...</div>
+
+      <!-- Step 1: Class Selection -->
+      <div class="selection-step">
+        <h3>1. Select Class</h3>
+        <div id="classList" class="list-container">
+          <div class="list-item" onclick="onClassSelected('11', this)">
+            Class 11
+          </div>
+          <div class="list-item" onclick="onClassSelected('12', this)">
+            Class 12
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Subject Selection -->
+      <div class="selection-step" id="subjectStep" style="display: none">
+        <h3>2. Select Subject</h3>
+        <div id="subjectList" class="list-container"></div>
+      </div>
+
+      <!-- Step 3: Chapter Selection -->
+      <div class="selection-step" id="chapterStep" style="display: none">
+        <h3>3. Select Chapter</h3>
+        <div id="chapterList" class="list-container"></div>
+      </div>
+
+      <!-- Step 4: Topic Selection -->
+      <div class="selection-step" id="topicStep" style="display: none">
+        <h3>4. Select Topic</h3>
+        <div id="topicList" class="list-container"></div>
+      </div>
+
+      <!-- Step 5: Subtopic Selection -->
+      <div class="selection-step" id="subtopicStep" style="display: none">
+        <h3>5. Select Subtopic</h3>
+        <div id="subtopicList" class="list-container"></div>
+      </div>
+
+      <!-- Result Area -->
+      <div id="resultContainer" class="result-container">
+        <h3>Generated Link</h3>
+        <div id="generatedUrl" class="url-box"></div>
+        <button class="btn" onclick="copyToClipboard()">Copy Link</button>
+        <a
+          id="openLinkBtn"
+          href="#"
+          target="_blank"
+          class="btn"
+          style="text-decoration: none; display: inline-block"
+          >Open Link</a
+        >
+      </div>
+    </div>
+
+    <script>
+      // Firebase Config (Same as other pages)
+      const firebaseConfig = {
+        apiKey: "AIzaSyDNqfRczOHTukGdXDnuzVXjbL7P5blnyAo",
+        authDomain: "dbydx-ea226.firebaseapp.com",
+        projectId: "dbydx-ea226",
+        storageBucket: "dbydx-ea226.firebasestorage.app",
+        messagingSenderId: "329650707379",
+        appId: "1:329650707379:web:18bab2bab403e1004b89c6",
+        measurementId: "G-2F7YVE2X94",
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+      const auth = firebase.auth();
+
+      // State
+      let selectedClass = "";
+      let selectedSubjectId = "";
+      let selectedChapterId = "";
+      let selectedTopicId = "";
+      let selectedSubtopicId = "";
+
+      // Auth Listener
+      auth.onAuthStateChanged((user) => {
+        const userDiv = document.getElementById("currentUser");
+        if (user) {
+          userDiv.textContent = `Logged in as: ${user.email || "Anonymous User"}`;
+        } else {
+          userDiv.textContent = "Not logged in (Auth required for some data)";
+          auth.signInAnonymously().catch(console.error);
+        }
+      });
+
+      // Helper to show/hide loading
+      const setLoading = (show) => {
+        document.getElementById("loading").style.display = show
+          ? "block"
+          : "none";
+      };
+
+      // Helper to reset lists
+      const resetList = (id) => {
+        const listContainer = document.getElementById(id);
+        listContainer.innerHTML = "";
+        document.getElementById(id.replace("List", "Step")).style.display =
+          "none";
+      };
+
+      // Helper to highlight selected item
+      const highlightSelection = (containerId, selectedElement) => {
+        const container = document.getElementById(containerId);
+        const items = container.getElementsByClassName("list-item");
+        for (let item of items) {
+          item.classList.remove("selected");
+        }
+        if (selectedElement) {
+          selectedElement.classList.add("selected");
+        }
+      };
+
+      // Step 1: Class Selected
+      function onClassSelected(cls, element) {
+        if (selectedClass === cls && element.classList.contains("selected"))
+          return;
+
+        selectedClass = cls;
+        highlightSelection("classList", element);
+
+        // Reset subsequent steps
+        resetList("subjectList");
+        resetList("chapterList");
+        resetList("topicList");
+        resetList("subtopicList");
+        document.getElementById("resultContainer").style.display = "none";
+
+        if (!selectedClass) return;
+
+        // Fetch Subjects
+        fetchSubjects();
+      }
+
+      async function fetchSubjects() {
+        setLoading(true);
+        const collectionName =
+          selectedClass === "11"
+            ? "chapterList_class11"
+            : "chapterList_class12";
+        const listContainer = document.getElementById("subjectList");
+
+        try {
+          const snapshot = await db.collection(collectionName).get();
+          listContainer.innerHTML = "";
+
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.textContent = data.name || data.title || doc.id;
+            div.onclick = () => onSubjectSelected(doc.id, div);
+            listContainer.appendChild(div);
+          });
+
+          document.getElementById("subjectStep").style.display = "block";
+        } catch (error) {
+          console.error("Error fetching subjects:", error);
+          alert("Error loading subjects");
+        }
+        setLoading(false);
+      }
+
+      // Step 2: Subject Selected
+      function onSubjectSelected(subjectId, element) {
+        if (
+          selectedSubjectId === subjectId &&
+          element.classList.contains("selected")
+        )
+          return;
+
+        selectedSubjectId = subjectId;
+        highlightSelection("subjectList", element);
+
+        resetList("chapterList");
+        resetList("topicList");
+        resetList("subtopicList");
+        document.getElementById("resultContainer").style.display = "none";
+
+        fetchChapters();
+      }
+
+      async function fetchChapters() {
+        setLoading(true);
+        const collectionName =
+          selectedClass === "11"
+            ? "chapterList_class11"
+            : "chapterList_class12";
+        const listContainer = document.getElementById("chapterList");
+
+        try {
+          const snapshot = await db
+            .collection(collectionName)
+            .doc(selectedSubjectId)
+            .collection("chapters")
+            .get();
+
+          listContainer.innerHTML = "";
+
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.textContent = data.name || doc.id;
+            div.onclick = () => onChapterSelected(doc.id, div);
+            listContainer.appendChild(div);
+          });
+
+          document.getElementById("chapterStep").style.display = "block";
+        } catch (error) {
+          console.error("Error fetching chapters:", error);
+          alert("Error loading chapters");
+        }
+        setLoading(false);
+      }
+
+      // Step 3: Chapter Selected
+      function onChapterSelected(chapterId, element) {
+        if (
+          selectedChapterId === chapterId &&
+          element.classList.contains("selected")
+        )
+          return;
+
+        selectedChapterId = chapterId;
+        highlightSelection("chapterList", element);
+
+        resetList("topicList");
+        resetList("subtopicList");
+        document.getElementById("resultContainer").style.display = "none";
+
+        fetchTopics();
+      }
+
+      async function fetchTopics() {
+        setLoading(true);
+        const collectionName =
+          selectedClass === "11"
+            ? "chapterList_class11"
+            : "chapterList_class12";
+        const listContainer = document.getElementById("topicList");
+
+        try {
+          const snapshot = await db
+            .collection(collectionName)
+            .doc(selectedSubjectId)
+            .collection("chapters")
+            .doc(selectedChapterId)
+            .collection("topics")
+            .get();
+
+          listContainer.innerHTML = "";
+
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const div = document.createElement("div");
+            div.className = "list-item";
+            div.textContent = data.name || doc.id;
+            div.onclick = () => onTopicSelected(doc.id, div);
+            listContainer.appendChild(div);
+          });
+
+          document.getElementById("topicStep").style.display = "block";
+        } catch (error) {
+          console.error("Error fetching topics:", error);
+          alert("Error loading topics");
+        }
+        setLoading(false);
+      }
+
+      // Step 4: Topic Selected
+      function onTopicSelected(topicId, element) {
+        if (
+          selectedTopicId === topicId &&
+          element.classList.contains("selected")
+        )
+          return;
+
+        selectedTopicId = topicId;
+        highlightSelection("topicList", element);
+
+        resetList("subtopicList");
+        document.getElementById("resultContainer").style.display = "none";
+
+        fetchSubtopics();
+      }
+
+      async function fetchSubtopics() {
+        setLoading(true);
+        const collectionName =
+          selectedClass === "11"
+            ? "chapterList_class11"
+            : "chapterList_class12";
+        const listContainer = document.getElementById("subtopicList");
+
+        try {
+          const snapshot = await db
+            .collection(collectionName)
+            .doc(selectedSubjectId)
+            .collection("chapters")
+            .doc(selectedChapterId)
+            .collection("topics")
+            .doc(selectedTopicId)
+            .collection("subtopiclist")
+            .get();
+
+          listContainer.innerHTML = "";
+
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const div = document.createElement("div");
+            div.className = "list-item";
+
+            const textDiv = document.createElement("div");
+            textDiv.textContent = data.name || doc.id;
+            div.appendChild(textDiv);
+
+            if (data.questionimage) {
+              const img = document.createElement("img");
+              img.src = data.questionimage;
+              img.alt = "Question Image";
+              div.appendChild(img);
+            }
+
+            div.onclick = () => onSubtopicSelected(doc.id, div);
+            listContainer.appendChild(div);
+          });
+
+          document.getElementById("subtopicStep").style.display = "block";
+        } catch (error) {
+          console.error("Error fetching subtopics:", error);
+          alert("Error loading subtopics");
+        }
+        setLoading(false);
+      }
+
+      // Step 5: Subtopic Selected (Final Step)
+      function onSubtopicSelected(subtopicId, element) {
+        selectedSubtopicId = subtopicId;
+        highlightSelection("subtopicList", element);
+
+        generateLink();
+      }
+
+      function generateLink() {
+        // Construct the URL: https://dbydx-ea226.web.app/play?sid={subjectId}&cid={chapterId}&tid={topicId}&stid={subtopicDocId}&cls={class}
+        const baseUrl = "https://dbydx-ea226.web.app/play";
+        const url = `${baseUrl}?sid=${selectedSubjectId}&cid=${selectedChapterId}&tid=${selectedTopicId}&stid=${selectedSubtopicId}&cls=${selectedClass}`;
+
+        const resultContainer = document.getElementById("resultContainer");
+        const urlBox = document.getElementById("generatedUrl");
+        const openBtn = document.getElementById("openLinkBtn");
+
+        urlBox.textContent = url;
+        openBtn.href = url;
+        resultContainer.style.display = "block";
+      }
+
+      function copyToClipboard() {
+        const url = document.getElementById("generatedUrl").textContent;
+        navigator.clipboard
+          .writeText(url)
+          .then(() => {
+            alert("Link copied to clipboard!");
+          })
+          .catch((err) => {
+            console.error("Failed to copy: ", err);
+          });
+      }
+    </script>
+  </body>
+</html>
