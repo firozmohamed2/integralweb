@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>View Revisions - Integral Web</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f8fafc;
+      }
+    </style>
+  </head>
+  <body class="text-slate-800 antialiased">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+      <!-- Header -->
+      <header class="mb-8 flex justify-between items-center">
+        <div>
+          <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+            My Revisions
+          </h1>
+          <p class="text-slate-500 text-sm mt-1">
+            Review and study your saved questions
+          </p>
+        </div>
+        <div class="flex gap-4">
+          <a
+            href="revision.html"
+            class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+          >
+            <i data-lucide="plus-circle" class="w-4 h-4"></i> Add New
+          </a>
+          <a
+            href="index.html"
+            class="text-sm font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1"
+          >
+            <i data-lucide="home" class="w-4 h-4"></i> Home
+          </a>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <div id="mainContent" class="hidden">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <!-- Left Column: Filters -->
+          <div class="md:col-span-1 space-y-6">
+            <div
+              class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 sticky top-6"
+            >
+              <h2 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i data-lucide="filter" class="w-4 h-4 text-blue-500"></i>
+                Filters
+              </h2>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 mb-1"
+                    >CLASS</label
+                  >
+                  <select
+                    id="classSelect"
+                    title="Select Class"
+                    class="w-full border-slate-200 rounded-lg p-2 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-100 outline-none"
+                  >
+                    <option value="">Select Class...</option>
+                    <option value="Class 11">Class 11</option>
+                    <option value="Class 12">Class 12</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 mb-1"
+                    >SUBJECT</label
+                  >
+                  <select
+                    id="subjectSelect"
+                    title="Select Subject"
+                    disabled
+                    class="w-full border-slate-200 rounded-lg p-2 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-100 outline-none disabled:opacity-50"
+                  >
+                    <option value="">Select Subject...</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 mb-1"
+                    >CHAPTER</label
+                  >
+                  <select
+                    id="chapterSelect"
+                    title="Select Chapter"
+                    disabled
+                    class="w-full border-slate-200 rounded-lg p-2 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-100 outline-none disabled:opacity-50"
+                  >
+                    <option value="">Select Chapter...</option>
+                  </select>
+                </div>
+                <button
+                  id="fetchBtn"
+                  disabled
+                  class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                >
+                  <i data-lucide="search" class="w-4 h-4"></i> Show Questions
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Questions List -->
+          <div class="md:col-span-3 space-y-6">
+            <div id="loadingState" class="hidden text-center py-12">
+              <i
+                data-lucide="loader-2"
+                class="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2"
+              ></i>
+              <p class="text-slate-500 text-sm">Loading questions...</p>
+            </div>
+
+            <div id="emptyState" class="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
+              <div class="bg-slate-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="book-open" class="w-6 h-6 text-slate-400"></i>
+              </div>
+              <h3 class="text-slate-900 font-medium mb-1">No questions selected</h3>
+              <p class="text-slate-500 text-sm">Select a chapter and click "Show Questions" to begin.</p>
+            </div>
+
+            <div id="questionsList" class="space-y-4 hidden">
+              <!-- Questions will be injected here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Login Warning -->
+      <div id="loginWarning" class="text-center py-20 hidden">
+        <div
+          class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 inline-block max-w-md"
+        >
+          <div
+            class="bg-yellow-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <i data-lucide="lock" class="text-yellow-600 w-6 h-6"></i>
+          </div>
+          <h2 class="text-xl font-bold text-slate-900 mb-2">
+            Authentication Required
+          </h2>
+          <p class="text-slate-500 mb-6">
+            Please log in to view your revisions.
+          </p>
+          <a
+            href="study_tracker.html"
+            class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+          >
+            Go to Login
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import {
+        getAuth,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      import {
+        getFirestore,
+        collection,
+        query,
+        where,
+        getDocs,
+        orderBy,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDNqfRczOHTukGdXDnuzVXjbL7P5blnyAo",
+        authDomain: "dbydx-ea226.firebaseapp.com",
+        projectId: "dbydx-ea226",
+        storageBucket: "dbydx-ea226.firebasestorage.app",
+        messagingSenderId: "329650707379",
+        appId: "1:329650707379:web:18bab2bab403e1004b89c6",
+        measurementId: "G-2F7YVE2X94",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      // Syllabus Data (Same as study_tracker.html)
+      const SYLLABUS_DATA = {
+        "Class 11": {
+          Physics: [
+            "Physical World",
+            "Units and Measurements",
+            "Motion in a Straight Line",
+            "Motion in a Plane",
+            "Laws of Motion",
+            "Work, Energy and Power",
+            "System of Particles and Rotational Motion",
+            "Gravitation",
+            "Mechanical Properties of Solids",
+            "Mechanical Properties of Fluids",
+            "Thermal Properties of Matter",
+            "Thermodynamics",
+            "Kinetic Theory",
+            "Oscillations",
+            "Waves",
+          ],
+          Chemistry: [
+            "Some Basic Concepts of Chemistry",
+            "Structure of Atom",
+            "Classification of Elements and Periodicity in Properties",
+            "Chemical Bonding and Molecular Structure",
+            "States of Matter",
+            "Thermodynamics",
+            "Equilibrium",
+            "Redox Reactions",
+            "Hydrogen",
+            "The s-Block Elements",
+            "The p-Block Elements",
+            "Organic Chemistry – Some Basic Principles and Techniques",
+            "Hydrocarbons",
+            "Environmental Chemistry",
+          ],
+          Mathematics: [
+            "Sets",
+            "Relations and Functions",
+            "Trigonometric Functions",
+            "Complex Numbers and Quadratic Equations",
+            "Linear Inequalities",
+            "Permutations and Combinations",
+            "Binomial Theorem",
+            "Sequences and Series",
+            "Straight Lines",
+            "Conic Sections",
+            "Introduction to Three Dimensional Geometry",
+            "Limits and Derivatives",
+            "Statistics",
+            "Probability",
+          ],
+          Biology: [
+            "The Living World",
+            "Biological Classification",
+            "Plant Kingdom",
+            "Animal Kingdom",
+            "Morphology of Flowering Plants",
+            "Anatomy of Flowering Plants",
+            "Structural Organisation in Animals",
+            "Cell: The Unit of Life",
+            "Biomolecules",
+            "Cell Cycle and Cell Division",
+            "Transport in Plants",
+            "Mineral Nutrition",
+            "Photosynthesis in Higher Plants",
+            "Respiration in Plants",
+            "Plant Growth and Development",
+            "Digestion and Absorption",
+            "Breathing and Exchange of Gases",
+            "Body Fluids and Circulation",
+            "Excretory Products and their Elimination",
+            "Locomotion and Movement",
+            "Neural Control and Coordination",
+            "Chemical Coordination and Integration",
+          ],
+          "Computer Science": [
+            "Computer System Overview",
+            "Data Representation",
+            "Boolean Logic",
+            "Getting Started with Python",
+            "Python Fundamentals",
+            "Data Handling",
+            "Flow of Control",
+            "Strings",
+            "Lists",
+            "Tuples and Dictionaries",
+            "Cyber Safety",
+          ],
+        },
+        "Class 12": {
+          Physics: [
+            "Electric Charges and Fields",
+            "Electrostatic Potential and Capacitance",
+            "Current Electricity",
+            "Moving Charges and Magnetism",
+            "Magnetism and Matter",
+            "Electromagnetic Induction",
+            "Alternating Current",
+            "Electromagnetic Waves",
+            "Ray Optics and Optical Instruments",
+            "Wave Optics",
+            "Dual Nature of Radiation and Matter",
+            "Atoms",
+            "Nuclei",
+            "Semiconductor Electronics",
+            "Communication Systems",
+          ],
+          Chemistry: [
+            "The Solid State",
+            "Solutions",
+            "Electrochemistry",
+            "Chemical Kinetics",
+            "Surface Chemistry",
+            "General Principles and Processes of Isolation of Elements",
+            "The p-Block Elements",
+            "The d- and f-Block Elements",
+            "Coordination Compounds",
+            "Haloalkanes and Haloarenes",
+            "Alcohols, Phenols and Ethers",
+            "Aldehydes, Ketones and Carboxylic Acids",
+            "Amines",
+            "Biomolecules",
+            "Polymers",
+            "Chemistry in Everyday Life",
+          ],
+          Mathematics: [
+            "Relations and Functions",
+            "Inverse Trigonometric Functions",
+            "Matrices",
+            "Determinants",
+            "Continuity and Differentiability",
+            "Applications of Derivatives",
+            "Integrals",
+            "Applications of Integrals",
+            "Differential Equations",
+            "Vector Algebra",
+            "Three Dimensional Geometry",
+            "Linear Programming",
+            "Probability",
+          ],
+          Biology: [
+            "Reproduction in Organisms",
+            "Sexual Reproduction in Flowering Plants",
+            "Human Reproduction",
+            "Reproductive Health",
+            "Principles of Inheritance and Variation",
+            "Molecular Basis of Inheritance",
+            "Evolution",
+            "Human Health and Disease",
+            "Strategies for Enhancement in Food Production",
+            "Microbes in Human Welfare",
+            "Biotechnology: Principles and Processes",
+            "Biotechnology and its Applications",
+            "Organisms and Populations",
+            "Ecosystem",
+            "Biodiversity and Conservation",
+            "Environmental Issues",
+          ],
+          "Computer Science": [
+            "Revision of Python Basics",
+            "Functions",
+            "File Handling",
+            "Exception Handling",
+            "Recursion",
+            "Data Structures",
+            "Stack",
+            "Queue",
+            "Searching",
+            "Sorting",
+            "Database Concepts",
+            "Structured Query Language",
+            "Computer Networks",
+          ],
+        },
+      };
+
+      // UI References
+      const mainContent = document.getElementById("mainContent");
+      const loginWarning = document.getElementById("loginWarning");
+      const classSelect = document.getElementById("classSelect");
+      const subjectSelect = document.getElementById("subjectSelect");
+      const chapterSelect = document.getElementById("chapterSelect");
+      const fetchBtn = document.getElementById("fetchBtn");
+      const questionsList = document.getElementById("questionsList");
+      const loadingState = document.getElementById("loadingState");
+      const emptyState = document.getElementById("emptyState");
+
+      // Auth Check
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          mainContent.classList.remove("hidden");
+          loginWarning.classList.add("hidden");
+          lucide.createIcons();
+        } else {
+          mainContent.classList.add("hidden");
+          loginWarning.classList.remove("hidden");
+        }
+      });
+
+      // Populate Dropdowns
+      classSelect.addEventListener("change", () => {
+        const selectedClass = classSelect.value;
+        subjectSelect.innerHTML = '<option value="">Select Subject...</option>';
+        chapterSelect.innerHTML = '<option value="">Select Chapter...</option>';
+        subjectSelect.disabled = true;
+        chapterSelect.disabled = true;
+        fetchBtn.disabled = true;
+
+        if (selectedClass && SYLLABUS_DATA[selectedClass]) {
+          subjectSelect.disabled = false;
+          Object.keys(SYLLABUS_DATA[selectedClass]).forEach((subject) => {
+            const option = document.createElement("option");
+            option.value = subject;
+            option.textContent = subject;
+            subjectSelect.appendChild(option);
+          });
+        }
+      });
+
+      subjectSelect.addEventListener("change", () => {
+        const selectedClass = classSelect.value;
+        const selectedSubject = subjectSelect.value;
+        chapterSelect.innerHTML = '<option value="">Select Chapter...</option>';
+        chapterSelect.disabled = true;
+        fetchBtn.disabled = true;
+
+        if (
+          selectedClass &&
+          selectedSubject &&
+          SYLLABUS_DATA[selectedClass][selectedSubject]
+        ) {
+          chapterSelect.disabled = false;
+          SYLLABUS_DATA[selectedClass][selectedSubject].forEach((chapter) => {
+            const option = document.createElement("option");
+            option.value = chapter;
+            option.textContent = chapter;
+            chapterSelect.appendChild(option);
+          });
+        }
+      });
+
+      chapterSelect.addEventListener("change", () => {
+        fetchBtn.disabled = !chapterSelect.value;
+      });
+
+      // Fetch Questions
+      fetchBtn.addEventListener("click", async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const selectedClass = classSelect.value;
+        const selectedSubject = subjectSelect.value;
+        const selectedChapter = chapterSelect.value;
+
+        if (!selectedClass || !selectedSubject || !selectedChapter) return;
+
+        // UI States
+        questionsList.innerHTML = "";
+        questionsList.classList.add("hidden");
+        emptyState.classList.add("hidden");
+        loadingState.classList.remove("hidden");
+        fetchBtn.disabled = true;
+
+        try {
+          const q = query(
+            collection(db, "revision_questions"),
+            where("userId", "==", user.uid),
+            where("classStream", "==", selectedClass),
+            where("subject", "==", selectedSubject),
+            where("chapter", "==", selectedChapter),
+            orderBy("serial", "asc")
+          );
+
+          const querySnapshot = await getDocs(q);
+          
+          loadingState.classList.add("hidden");
+          fetchBtn.disabled = false;
+
+          if (querySnapshot.empty) {
+            emptyState.classList.remove("hidden");
+            emptyState.querySelector("h3").textContent = "No questions found";
+            emptyState.querySelector("p").textContent = "Try adding some questions in the Revision Manager.";
+          } else {
+            questionsList.classList.remove("hidden");
+            querySnapshot.forEach((doc) => {
+              const data = doc.data();
+              renderQuestionCard(data);
+            });
+            lucide.createIcons();
+          }
+
+        } catch (error) {
+          console.error("Error fetching questions:", error);
+          loadingState.classList.add("hidden");
+          fetchBtn.disabled = false;
+          alert("Error fetching questions: " + error.message);
+        }
+      });
+
+      function renderQuestionCard(data) {
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow";
+        
+        card.innerHTML = `
+          <div class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center font-bold text-sm">
+              ${data.serial}
+            </div>
+            <div class="flex-grow">
+              <h3 class="text-slate-900 font-semibold mb-3 whitespace-pre-wrap">${data.question}</h3>
+              
+              <div class="answer-section mt-4 pt-4 border-t border-slate-100 hidden">
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Answer</span>
+                  <p class="text-slate-700 whitespace-pre-wrap">${data.answer}</p>
+                </div>
+              </div>
+
+              <button class="toggle-answer-btn mt-2 text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center gap-1">
+                <i data-lucide="eye" class="w-4 h-4"></i> Show Answer
+              </button>
+            </div>
+          </div>
+        `;
+
+        const toggleBtn = card.querySelector(".toggle-answer-btn");
+        const answerSection = card.querySelector(".answer-section");
+        const icon = toggleBtn.querySelector("i");
+
+        toggleBtn.addEventListener("click", () => {
+          const isHidden = answerSection.classList.contains("hidden");
+          if (isHidden) {
+            answerSection.classList.remove("hidden");
+            toggleBtn.innerHTML = '<i data-lucide="eye-off" class="w-4 h-4"></i> Hide Answer';
+          } else {
+            answerSection.classList.add("hidden");
+            toggleBtn.innerHTML = '<i data-lucide="eye" class="w-4 h-4"></i> Show Answer';
+          }
+          lucide.createIcons();
+        });
+
+        questionsList.appendChild(card);
+      }
+    </script>
+  </body>
+</html>

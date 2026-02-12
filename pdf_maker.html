@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pro Worksheet Generator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- MathJax for LaTeX -->
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ],
+          displayMath: [
+            ["$$", "$$"],
+            ["\\[", "\\]"],
+          ],
+          processEscapes: true,
+        },
+        options: {
+          skipHtmlTags: ["script", "noscript", "style", "textarea", "pre"],
+        },
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f8fafc;
+      }
+
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      /* PDF Generation styles */
+      .pdf-template-container {
+        width: 800px !important;
+        padding: 50px;
+        background: white;
+        color: #1e293b;
+        box-sizing: border-box;
+        text-align: left;
+      }
+
+      .pdf-question-block {
+        display: block !important;
+        width: 100% !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin-top: 20px !important;
+        margin-bottom: 40px !important;
+        padding-bottom: 30px;
+        border-bottom: 1px solid #e2e8f0;
+        box-sizing: border-box;
+        position: relative;
+      }
+
+      .html2pdf__page-break {
+        display: block;
+        height: 0;
+        page-break-before: always;
+        break-before: page;
+      }
+
+      .math-rendering {
+        min-height: 1.5em;
+      }
+
+      .step-active {
+        border-color: #3b82f6;
+        background-color: #eff6ff;
+      }
+
+      .loader {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3b82f6;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body class="text-slate-800 antialiased">
+    <!-- Generation Overlay -->
+    <div
+      id="generationOverlay"
+      class="fixed inset-0 bg-white z-[5000] hidden flex-col items-center justify-center"
+    >
+      <div class="loader w-12 h-12 mb-4"></div>
+      <h2 class="text-2xl font-bold text-slate-900">Building Worksheet</h2>
+      <p
+        id="generationProgress"
+        class="text-slate-500 mt-2 text-center max-w-xs text-sm"
+      >
+        Processing layout and rendering math... Please wait.
+      </p>
+    </div>
+
+    <!-- Main Container -->
+    <div class="max-w-6xl mx-auto px-4 py-8">
+      <header
+        class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4"
+      >
+        <div>
+          <h1
+            class="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2"
+          >
+            <i data-lucide="file-text" class="text-blue-600"></i>
+            Worksheet Pro
+          </h1>
+          <p class="text-slate-500 text-sm mt-1" id="authStatus">
+            Initialising systems...
+          </p>
+        </div>
+        <div
+          id="actionHeader"
+          class="hidden flex flex-col sm:flex-row items-end sm:items-center gap-4"
+        >
+          <div
+            class="flex items-center gap-2 bg-white border border-slate-200 px-3 py-2 rounded-lg shadow-sm"
+          >
+            <input
+              type="checkbox"
+              id="onePerPageToggle"
+              class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <label
+              for="onePerPageToggle"
+              class="text-xs font-semibold text-slate-600 cursor-pointer select-none"
+              >Single Question Per Page</label
+            >
+          </div>
+          <button
+            id="pdfExportBtn"
+            onclick="generatePDF()"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-sm transition-all flex items-center gap-2"
+          >
+            <i data-lucide="download" class="w-4 h-4"></i>
+            Export PDF
+          </button>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Sidebar -->
+        <aside class="lg:col-span-4 space-y-4">
+          <div
+            class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+          >
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+              <h3
+                class="font-bold text-slate-700 text-sm uppercase tracking-wider flex items-center gap-2"
+              >
+                <span
+                  class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs"
+                  >1</span
+                >
+                Grade
+              </h3>
+            </div>
+            <div class="p-2 grid grid-cols-2 gap-2" id="classList">
+              <button
+                onclick="onClassSelected('11', this)"
+                class="p-3 text-center rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all font-medium text-slate-600"
+              >
+                Class 11
+              </button>
+              <button
+                onclick="onClassSelected('12', this)"
+                class="p-3 text-center rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all font-medium text-slate-600"
+              >
+                Class 12
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="subjectStep"
+            class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden"
+          >
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+              <h3
+                class="font-bold text-slate-700 text-sm uppercase tracking-wider flex items-center gap-2"
+              >
+                <span
+                  class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs"
+                  >2</span
+                >
+                Subject
+              </h3>
+            </div>
+            <div
+              class="p-2 max-h-48 overflow-y-auto custom-scrollbar space-y-1"
+              id="subjectList"
+            ></div>
+          </div>
+
+          <div
+            id="chapterStep"
+            class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden"
+          >
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+              <h3
+                class="font-bold text-slate-700 text-sm uppercase tracking-wider flex items-center gap-2"
+              >
+                <span
+                  class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs"
+                  >3</span
+                >
+                Chapter
+              </h3>
+            </div>
+            <div
+              class="p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-1"
+              id="chapterList"
+            ></div>
+          </div>
+
+          <div
+            id="topicStep"
+            class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden"
+          >
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+              <h3
+                class="font-bold text-slate-700 text-sm uppercase tracking-wider flex items-center gap-2"
+              >
+                <span
+                  class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs"
+                  >4</span
+                >
+                Topic
+              </h3>
+            </div>
+            <div
+              class="p-2 max-h-60 overflow-y-auto custom-scrollbar space-y-1"
+              id="topicList"
+            ></div>
+          </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="lg:col-span-8">
+          <div id="questionsContainer" class="hidden space-y-6">
+            <div
+              class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm"
+            >
+              <div>
+                <h2
+                  class="text-xl font-bold text-slate-900"
+                  id="currentTopicTitle"
+                >
+                  Questions
+                </h2>
+                <span
+                  id="selectionCount"
+                  class="text-xs font-semibold text-blue-600 uppercase tracking-wide"
+                  >0 Selected</span
+                >
+              </div>
+              <!-- Added Select All Checkbox -->
+              <div
+                class="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 group"
+              >
+                <input
+                  type="checkbox"
+                  id="selectAllCheckbox"
+                  onchange="toggleSelectAll(this.checked)"
+                  class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
+                />
+                <label
+                  for="selectAllCheckbox"
+                  class="text-sm font-semibold text-slate-700 cursor-pointer select-none"
+                  >Select All Questions</label
+                >
+              </div>
+            </div>
+            <div id="subtopicList" class="space-y-4"></div>
+          </div>
+
+          <div
+            id="emptyState"
+            class="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center"
+          >
+            <div
+              class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"
+            >
+              <i data-lucide="layers" class="text-slate-300 w-8 h-8"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-slate-900">
+              No topic selected
+            </h3>
+            <p class="text-slate-500 max-w-xs mx-auto mt-2 text-sm">
+              Select options on the left to start building your worksheet.
+            </p>
+          </div>
+
+          <div
+            id="globalLoading"
+            class="hidden py-12 flex flex-col items-center"
+          >
+            <div class="loader mb-4"></div>
+            <p class="text-slate-500 font-medium">Fetching content...</p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Hidden Worker Sandbox -->
+    <div
+      id="pdfWorkerArea"
+      style="position: fixed; top: 0; left: 0; width: 800px; z-index: 10"
+    ></div>
+
+    <!-- Custom Modal -->
+    <div
+      id="modalOverlay"
+      class="fixed inset-0 bg-slate-900/50 z-[10000] hidden items-center justify-center p-4 backdrop-blur-sm"
+    >
+      <div
+        class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center"
+      >
+        <div
+          id="modalIcon"
+          class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 bg-red-100 text-red-600"
+        >
+          <i data-lucide="alert-circle"></i>
+        </div>
+        <h3 id="modalTitle" class="text-lg font-bold text-slate-900 mb-2">
+          Notice
+        </h3>
+        <p id="modalBody" class="text-slate-600 mb-6 text-sm"></p>
+        <button
+          onclick="closeModal()"
+          class="w-full bg-slate-900 text-white py-2.5 rounded-lg font-semibold hover:bg-slate-800 transition-colors"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import {
+        getAuth,
+        signInAnonymously,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      import {
+        getFirestore,
+        collection,
+        getDocs,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDNqfRczOHTukGdXDnuzVXjbL7P5blnyAo",
+        authDomain: "dbydx-ea226.firebaseapp.com",
+        projectId: "dbydx-ea226",
+        storageBucket: "dbydx-ea226.firebasestorage.app",
+        messagingSenderId: "329650707379",
+        appId: "1:329650707379:web:18bab2bab403e1004b89c6",
+        measurementId: "G-2F7YVE2X94",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      let selectedClass = "";
+      let selectedSubjectId = "";
+      let selectedChapterId = "";
+      let selectedTopicId = "";
+      let selectedTopicName = "";
+      let currentSubtopicsData = [];
+      let selectedSubtopicIds = new Set();
+      let isGenerating = false; // Flag to prevent multiple concurrent generation tasks (fixes AbortError)
+
+      const showModal = (title, body, type = "error") => {
+        const modal = document.getElementById("modalOverlay");
+        const icon = document.getElementById("modalIcon");
+        document.getElementById("modalTitle").textContent = title;
+        document.getElementById("modalBody").textContent = body;
+
+        if (type === "error") {
+          icon.className =
+            "w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 bg-red-100 text-red-600";
+          icon.innerHTML = '<i data-lucide="alert-circle"></i>';
+        } else {
+          icon.className =
+            "w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 bg-blue-100 text-blue-600";
+          icon.innerHTML = '<i data-lucide="info"></i>';
+        }
+        lucide.createIcons();
+        modal.style.display = "flex";
+      };
+
+      window.closeModal = () =>
+        (document.getElementById("modalOverlay").style.display = "none");
+
+      const setGlobalLoading = (loading) => {
+        document
+          .getElementById("globalLoading")
+          .classList.toggle("hidden", !loading);
+        if (loading)
+          document.getElementById("emptyState").classList.add("hidden");
+      };
+
+      const highlightSelection = (parentId, element) => {
+        const siblings = document
+          .getElementById(parentId)
+          .querySelectorAll("button, .list-item");
+        siblings.forEach((s) =>
+          s.classList.remove(
+            "step-active",
+            "border-blue-500",
+            "bg-blue-50",
+            "text-blue-700",
+            "ring-2",
+            "ring-blue-100",
+          ),
+        );
+        element.classList.add(
+          "step-active",
+          "border-blue-500",
+          "bg-blue-50",
+          "text-blue-700",
+          "ring-2",
+          "ring-blue-100",
+        );
+      };
+
+      onAuthStateChanged(auth, (user) => {
+        const statusEl = document.getElementById("authStatus");
+        if (user) {
+          statusEl.innerHTML = `<span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-green-500 rounded-full"></span> Ready: ${user.uid.substring(0, 8)}</span>`;
+        } else {
+          statusEl.textContent = "Authenticating...";
+          signInAnonymously(auth).catch(console.error);
+        }
+      });
+
+      window.onClassSelected = async (cls, element) => {
+        selectedClass = cls;
+        highlightSelection("classList", element);
+        ["subjectStep", "chapterStep", "topicStep"].forEach((id) =>
+          document.getElementById(id).classList.add("hidden"),
+        );
+        document.getElementById("questionsContainer").classList.add("hidden");
+        document.getElementById("actionHeader").classList.add("hidden");
+        setGlobalLoading(true);
+        const colName =
+          cls === "11" ? "chapterList_class11" : "chapterList_class12";
+        try {
+          const snap = await getDocs(collection(db, colName));
+          const list = document.getElementById("subjectList");
+          list.innerHTML = "";
+          snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            const btn = document.createElement("button");
+            btn.className =
+              "w-full text-left p-3 rounded-lg border border-transparent hover:bg-slate-50 transition-all text-sm font-medium text-slate-700 flex items-center justify-between group";
+            btn.innerHTML = `<span>${data.name || docSnap.id}</span> <i data-lucide="chevron-right" class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"></i>`;
+            btn.onclick = () => onSubjectSelected(docSnap.id, btn);
+            list.appendChild(btn);
+          });
+          document.getElementById("subjectStep").classList.remove("hidden");
+          lucide.createIcons();
+        } catch (error) {
+          showModal("Connection Error", "Failed to retrieve subjects.");
+        } finally {
+          setGlobalLoading(false);
+        }
+      };
+
+      const onSubjectSelected = async (subjectId, element) => {
+        selectedSubjectId = subjectId;
+        highlightSelection("subjectList", element);
+        ["chapterStep", "topicStep"].forEach((id) =>
+          document.getElementById(id).classList.add("hidden"),
+        );
+        document.getElementById("questionsContainer").classList.add("hidden");
+        setGlobalLoading(true);
+        const colName =
+          selectedClass === "11"
+            ? "chapterList_class11"
+            : "chapterList_class12";
+        try {
+          const snap = await getDocs(
+            collection(db, colName, subjectId, "chapters"),
+          );
+          const list = document.getElementById("chapterList");
+          list.innerHTML = "";
+          snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            const btn = document.createElement("button");
+            btn.className =
+              "w-full text-left p-3 rounded-lg border border-transparent hover:bg-slate-50 transition-all text-sm font-medium text-slate-700 flex items-center justify-between group";
+            btn.innerHTML = `<span>${data.name || docSnap.id}</span> <i data-lucide="chevron-right" class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"></i>`;
+            btn.onclick = () => onChapterSelected(docSnap.id, btn);
+            list.appendChild(btn);
+          });
+          document.getElementById("chapterStep").classList.remove("hidden");
+          lucide.createIcons();
+        } catch (err) {
+          showModal("Connection Error", "Failed to retrieve chapters.");
+        } finally {
+          setGlobalLoading(false);
+        }
+      };
+
+      const onChapterSelected = async (chapterId, element) => {
+        selectedChapterId = chapterId;
+        highlightSelection("chapterList", element);
+        document.getElementById("topicStep").classList.add("hidden");
+        document.getElementById("questionsContainer").classList.add("hidden");
+        setGlobalLoading(true);
+        const col =
+          selectedClass === "11"
+            ? "chapterList_class11"
+            : "chapterList_class12";
+        try {
+          const snap = await getDocs(
+            collection(
+              db,
+              col,
+              selectedSubjectId,
+              "chapters",
+              chapterId,
+              "topics",
+            ),
+          );
+          const list = document.getElementById("topicList");
+          list.innerHTML = "";
+          snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            const btn = document.createElement("button");
+            btn.className =
+              "w-full text-left p-3 rounded-lg border border-transparent hover:bg-slate-50 transition-all text-sm font-medium text-slate-700 flex items-center justify-between group";
+            btn.innerHTML = `<span>${data.name || docSnap.id}</span> <i data-lucide="chevron-right" class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"></i>`;
+            btn.onclick = () =>
+              onTopicSelected(docSnap.id, data.name || docSnap.id, btn);
+            list.appendChild(btn);
+          });
+          document.getElementById("topicStep").classList.remove("hidden");
+          lucide.createIcons();
+        } catch (err) {
+          showModal("Connection Error", "Failed to retrieve topics.");
+        } finally {
+          setGlobalLoading(false);
+        }
+      };
+
+      const onTopicSelected = async (topicId, topicName, element) => {
+        selectedTopicId = topicId;
+        selectedTopicName = topicName;
+        highlightSelection("topicList", element);
+        selectedSubtopicIds.clear();
+
+        // RESET SELECT ALL UI
+        const selectAllCheckbox = document.getElementById("selectAllCheckbox");
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+
+        updateCount();
+        setGlobalLoading(true);
+        const col =
+          selectedClass === "11"
+            ? "chapterList_class11"
+            : "chapterList_class12";
+        try {
+          const snap = await getDocs(
+            collection(
+              db,
+              col,
+              selectedSubjectId,
+              "chapters",
+              selectedChapterId,
+              "topics",
+              topicId,
+              "subtopiclist",
+            ),
+          );
+          const list = document.getElementById("subtopicList");
+          list.innerHTML = "";
+          let items = [];
+          snap.forEach((docSnap) =>
+            items.push({ id: docSnap.id, ...docSnap.data() }),
+          );
+          items.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+          currentSubtopicsData = items;
+          items.forEach((data) => {
+            const card = document.createElement("div");
+            card.id = `card-${data.id}`;
+            card.className =
+              "bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer group flex gap-4";
+            const solutionUrl = `https://dbydx-ea226.web.app/play?sid=${selectedSubjectId}&cid=${selectedChapterId}&tid=${selectedTopicId}&stid=${data.id}&cls=${selectedClass}`;
+            card.innerHTML = `
+                <div class="flex-shrink-0 pt-1">
+                    <input type="checkbox" class="question-checkbox w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 transition-all" value="${data.id}">
+                </div>
+                <div class="flex-grow">
+                    ${data.questiontext ? `<div class="text-slate-800 font-medium mb-3 math-rendering">${data.questiontext}</div>` : ""}
+                    ${data.questionimage ? `<div class="mb-4 bg-slate-50 rounded-lg p-2 border border-slate-100 text-center"><img src="${data.questionimage}" class="max-h-60 rounded mx-auto object-contain" alt="Question"></div>` : ""}
+                    <div class="flex items-center gap-3">
+                        <a href="${solutionUrl}" target="_blank" class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded transition-colors">
+                            <i data-lucide="external-link" class="w-3 h-3"></i> View Solution
+                        </a>
+                    </div>
+                </div>
+            `;
+            const checkbox = card.querySelector("input");
+            card.onclick = (e) => {
+              if (e.target !== checkbox && !e.target.closest("a")) {
+                checkbox.checked = !checkbox.checked;
+                toggleSelection(data.id, checkbox.checked, card);
+              }
+            };
+            checkbox.onchange = () =>
+              toggleSelection(data.id, checkbox.checked, card);
+            list.appendChild(card);
+          });
+          document.getElementById("currentTopicTitle").textContent = topicName;
+          document
+            .getElementById("questionsContainer")
+            .classList.remove("hidden");
+          document.getElementById("actionHeader").classList.remove("hidden");
+          if (window.MathJax) MathJax.typesetPromise();
+          lucide.createIcons();
+        } catch (err) {
+          showModal("Connection Error", "Failed to retrieve questions.");
+        } finally {
+          setGlobalLoading(false);
+        }
+      };
+
+      const toggleSelection = (id, checked, element) => {
+        if (checked) {
+          selectedSubtopicIds.add(id);
+          if (element)
+            element.classList.add(
+              "border-blue-400",
+              "bg-blue-50/30",
+              "ring-1",
+              "ring-blue-200",
+            );
+        } else {
+          selectedSubtopicIds.delete(id);
+          if (element)
+            element.classList.remove(
+              "border-blue-400",
+              "bg-blue-50/30",
+              "ring-1",
+              "ring-blue-200",
+            );
+        }
+
+        // SYNC SELECT ALL CHECKBOX
+        const selectAllEl = document.getElementById("selectAllCheckbox");
+        if (selectAllEl) {
+          selectAllEl.checked =
+            selectedSubtopicIds.size === currentSubtopicsData.length &&
+            currentSubtopicsData.length > 0;
+        }
+
+        updateCount();
+      };
+
+      // SELECT ALL LOGIC Implementation
+      window.toggleSelectAll = (checked) => {
+        const checkboxes = document.querySelectorAll(".question-checkbox");
+        checkboxes.forEach((cb) => {
+          cb.checked = checked;
+          const card = document.getElementById(`card-${cb.value}`);
+          if (checked) {
+            selectedSubtopicIds.add(cb.value);
+            if (card)
+              card.classList.add(
+                "border-blue-400",
+                "bg-blue-50/30",
+                "ring-1",
+                "ring-blue-200",
+              );
+          } else {
+            selectedSubtopicIds.delete(cb.value);
+            if (card)
+              card.classList.remove(
+                "border-blue-400",
+                "bg-blue-50/30",
+                "ring-1",
+                "ring-blue-200",
+              );
+          }
+        });
+        updateCount();
+      };
+
+      const updateCount = () => {
+        document.getElementById("selectionCount").textContent =
+          `${selectedSubtopicIds.size} Selected`;
+      };
+
+      window.generatePDF = async () => {
+        if (isGenerating) return; // Fix AbortError by preventing multiple triggers
+        if (selectedSubtopicIds.size === 0) {
+          showModal(
+            "Selection Empty",
+            "Please select at least one question.",
+            "info",
+          );
+          return;
+        }
+
+        const overlay = document.getElementById("generationOverlay");
+        const workerArea = document.getElementById("pdfWorkerArea");
+        const onePerPage = document.getElementById("onePerPageToggle").checked;
+
+        isGenerating = true;
+        const originalY = window.scrollY;
+        window.scrollTo(0, 0);
+
+        await new Promise((r) => setTimeout(r, 100));
+
+        overlay.style.display = "flex";
+
+        const pdfElement = document.createElement("div");
+        pdfElement.className = "pdf-template-container";
+
+        let questionsHtml = "";
+        const selectedItems = currentSubtopicsData.filter((q) =>
+          selectedSubtopicIds.has(q.id),
+        );
+
+        selectedItems.forEach((q, i) => {
+          const solutionUrl = `https://dbydx-ea226.web.app/play?sid=${selectedSubjectId}&cid=${selectedChapterId}&tid=${selectedTopicId}&stid=${q.id}&cls=${selectedClass}`;
+
+          if (onePerPage && i > 0) {
+            questionsHtml += `<div class="html2pdf__page-break"></div>`;
+          }
+
+          questionsHtml += `
+                <div class="pdf-question-block">
+                    <div style="font-weight: 800; margin-bottom: 12px; color: #1e293b; font-size: 14px;">Question ${i + 1}</div>
+                    ${q.questiontext ? `<div style="font-size: 16px; line-height: 1.6; margin-bottom: 20px; color: #334155;">${q.questiontext}</div>` : ""}
+                    ${
+                      q.questionimage
+                        ? `
+                        <div style="margin: 20px 0; text-align: center; width: 100%; display: block; page-break-inside: avoid;">
+                            <img src="${q.questionimage}" crossOrigin="anonymous" style="max-width: 95%; height: auto; max-height: 400px; border-radius: 6px; object-fit: contain; display: block; margin-bottom: 20px;">
+                        </div>
+                    `
+                        : ""
+                    }
+                    <div style="margin-top: 15px; display: block;">
+                       <a href="${solutionUrl}" target="_blank" 
+                          style="display: inline-block; padding: 10px 24px; background-color: #2563eb; color: #ffffff !important; text-decoration: none; font-weight: bold; font-size: 14px; border-radius: 4px; border: 1px solid #1e3a8a; line-height: 1;">
+                         View Step-by-Step Solution &rarr;
+                       </a>
+                    </div>
+                </div>
+            `;
+        });
+
+        pdfElement.innerHTML = `
+          <div style="border-bottom: 3px solid #3b82f6; padding-bottom: 15px; margin-bottom: 40px;">
+            <h1 style="font-size: 24px; font-weight: 800; margin: 0; color: #0f172a;">${selectedTopicName}</h1>
+            <p style="font-size: 13px; color: #64748b; margin-top: 6px;">Class ${selectedClass} Worksheet • Generated ${new Date().toLocaleDateString()}</p>
+          </div>
+          ${questionsHtml}
+          <footer style="margin-top: 60px; border-top: 1px solid #f1f5f9; padding-top: 20px; text-align: center; font-size: 11px; color: #94a3b8; font-style: italic;">
+            Document generated by Worksheet Pro. All rights reserved.
+          </footer>
+        `;
+
+        workerArea.innerHTML = "";
+        workerArea.appendChild(pdfElement);
+
+        const allImages = Array.from(pdfElement.querySelectorAll("img"));
+        await Promise.all(
+          allImages.map((img) => {
+            if (img.complete) return Promise.resolve();
+            return new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+          }),
+        );
+
+        if (window.MathJax) await MathJax.typesetPromise([pdfElement]);
+
+        const opt = {
+          margin: 0,
+          filename: `Worksheet_${selectedTopicName.replace(/\s+/g, "_")}.pdf`,
+          image: { type: "jpeg", quality: 1.0 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            width: 800,
+            windowWidth: 800,
+            scrollY: 0,
+            scrollX: 0,
+          },
+          jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+          pagebreak: {
+            mode: ["css", "legacy"],
+            before: onePerPage ? ".html2pdf__page-break" : "",
+            avoid: ".pdf-question-block",
+          },
+        };
+
+        setTimeout(() => {
+          html2pdf()
+            .set(opt)
+            .from(pdfElement)
+            .toPdf()
+            .get("pdf")
+            .then((pdf) => {
+              pdf.save(
+                `Worksheet_${selectedTopicName.replace(/\s+/g, "_")}.pdf`,
+              );
+              overlay.style.display = "none";
+              workerArea.innerHTML = "";
+              window.scrollTo(0, originalY);
+              isGenerating = false;
+            })
+            .catch((err) => {
+              console.error("Capture Error:", err);
+              overlay.style.display = "none";
+              window.scrollTo(0, originalY);
+              showModal(
+                "Capture Failed",
+                "The generator failed to process the document.",
+              );
+              isGenerating = false;
+            });
+        }, 3000);
+      };
+
+      lucide.createIcons();
+    </script>
+  </body>
+</html>

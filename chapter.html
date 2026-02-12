@@ -300,6 +300,18 @@
             placeholder="e.g. Differentiation"
           />
         </div>
+        <div class="form-group">
+          <label>Order (Number)</label>
+          <input type="number" id="newChapterOrder" placeholder="e.g. 1" />
+        </div>
+        <div class="form-group">
+          <label>Icon Name (Optional)</label>
+          <input
+            type="text"
+            id="newChapterIcon"
+            placeholder="e.g. calculator"
+          />
+        </div>
         <div class="modal-footer">
           <button
             class="btn"
@@ -363,8 +375,66 @@
     <div id="subtopicJsonModal" class="modal">
       <div class="modal-content">
         <h3 id="subtopicJsonTitle">Edit Subtopic JSON</h3>
+        <div class="modal-footer">
+          <button
+            class="btn"
+            style="background-color: #6c757d"
+            onclick="closeSubtopicJsonModal()"
+          >
+            Cancel
+          </button>
+          <button class="btn" onclick="saveSubtopicJson()">Save JSON</button>
+        </div>
         <div class="form-group">
           <label>Current Data (Editable)</label>
+          <div class="form-group" style="margin-bottom: 10px">
+            <label style="font-size: 12px; font-weight: bold; display: block"
+              >Order (Number)</label
+            >
+            <input
+              type="number"
+              id="orderInput"
+              style="
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+              "
+              placeholder="e.g. 1, 2, 3..."
+            />
+          </div>
+          <div class="form-group" style="margin-bottom: 10px">
+            <label style="font-size: 12px; font-weight: bold; display: block"
+              >Question Text</label
+            >
+            <textarea
+              id="questionTextInput"
+              style="
+                width: 100%;
+                height: 60px;
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+              "
+              placeholder="Enter question text here..."
+            ></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom: 10px">
+            <label style="font-size: 12px; font-weight: bold; display: block"
+              >Primary Video</label
+            >
+            <input
+              type="text"
+              id="primaryVideoInput"
+              style="
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+              "
+              placeholder="Primary Video URL/ID"
+            />
+          </div>
           <div
             id="subtopicFieldsContainer"
             style="
@@ -414,13 +484,6 @@
             >
               Answer Image 3
             </button>
-            <button
-              class="btn"
-              style="padding: 5px 10px; font-size: 12px"
-              onclick="addQuestionText()"
-            >
-              Question Text
-            </button>
             <div
               id="currentImageType"
               style="font-size: 11px; color: #007bff; margin-top: 5px"
@@ -444,16 +507,6 @@
           >
             Uploading image...
           </div>
-        </div>
-        <div class="modal-footer">
-          <button
-            class="btn"
-            style="background-color: #6c757d"
-            onclick="closeSubtopicJsonModal()"
-          >
-            Cancel
-          </button>
-          <button class="btn" onclick="saveSubtopicJson()">Save JSON</button>
         </div>
       </div>
     </div>
@@ -503,6 +556,7 @@
       let currentSubtopicDocId = "";
       let currentSubtopicLabel = "";
       let currentImageType = "questionimage";
+      let editingChapterId = null;
 
       function setImageType(type) {
         currentImageType = type;
@@ -604,13 +658,42 @@
             return;
           }
 
+          const chapters = [];
           querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            const chapterName = data.name || doc.id;
+            chapters.push({ id: doc.id, ...doc.data() });
+          });
+
+          // Sort by Order
+          chapters.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+          chapters.forEach((data) => {
+            const chapterName = data.name || data.id;
             const div = document.createElement("div");
             div.className = "chapter-item list-item";
-            div.innerText = chapterName;
-            div.onclick = () => fetchTopics(doc.id, chapterName);
+            div.style.display = "flex";
+            div.style.justifyContent = "space-between";
+            div.style.alignItems = "center";
+
+            const span = document.createElement("span");
+            span.innerText = `${data.order ? data.order + ". " : ""}${chapterName}`;
+            span.style.flexGrow = "1";
+            span.onclick = () => fetchTopics(data.id, chapterName);
+
+            const editBtn = document.createElement("button");
+            editBtn.innerText = "Edit";
+            editBtn.className = "btn";
+            editBtn.style.padding = "5px 10px";
+            editBtn.style.fontSize = "12px";
+            editBtn.style.marginLeft = "10px";
+            editBtn.style.backgroundColor = "#ffc107";
+            editBtn.style.color = "#000";
+            editBtn.onclick = (e) => {
+              e.stopPropagation();
+              openEditChapterModal(data.id, data);
+            };
+
+            div.appendChild(span);
+            div.appendChild(editBtn);
             contentList.appendChild(div);
           });
         } catch (error) {
@@ -665,6 +748,26 @@
             div.onclick = () => fetchSubtopics(doc.id, topicName);
             contentList.appendChild(div);
           });
+
+          // Check if topicsCount needs update
+          const chapterRef = db
+            .collection(currentCollection)
+            .doc(currentDocId)
+            .collection("chapters")
+            .doc(chapterId);
+
+          chapterRef.get().then((doc) => {
+            if (doc.exists) {
+              const data = doc.data();
+              if (data.topicsCount === undefined) {
+                const count = querySnapshot.size;
+                chapterRef
+                  .update({ topicsCount: count })
+                  .then(() => console.log(`Updated topicsCount to ${count}`))
+                  .catch((e) => console.error("Error updating topicsCount", e));
+              }
+            }
+          });
         } catch (error) {
           console.error("Error fetching topics: ", error);
           loading.style.display = "none";
@@ -710,22 +813,66 @@
             return;
           }
 
+          let subtopics = [];
           querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            const subtopicLabel = data.name || doc.id;
+            subtopics.push({ id: doc.id, ...doc.data() });
+          });
+
+          // Sort client-side: items with 'order' first (sorted asc), then others
+          subtopics.sort((a, b) => {
+            const orderA =
+              a.order !== undefined ? a.order : Number.MAX_SAFE_INTEGER;
+            const orderB =
+              b.order !== undefined ? b.order : Number.MAX_SAFE_INTEGER;
+            return orderA - orderB;
+          });
+
+          subtopics.forEach((data) => {
+            const subtopicLabel = data.name || data.id;
             const div = document.createElement("div");
             div.className = "chapter-item";
-            
-            if (data.questionimage) {
-                // If questionimage exists, show it (larger size)
-                div.innerHTML = `<img src="${data.questionimage}" alt="Question" style="max-width: 100%; max-height: 300px; display: block; margin: 0 auto;">`;
+
+            if (data.questiontext) {
+              // If questiontext exists, show it
+              div.innerHTML = `<div style="font-size: 14px; font-weight: 500; margin-bottom: 5px;">${data.questiontext}</div>`;
+              // Optionally show image if user wants both, but request said "if no question text only , show question image"
+              // which implies priority. However, usually context needs both.
+              // Let's show image small if text is present? Or just text?
+              // Based on "if I add question text , show it", I'll show text.
+            } else if (data.questionimage) {
+              // If questionimage exists (and no text), show it
+              div.innerHTML = `<img src="${data.questionimage}" alt="Question" style="max-width: 100%; max-height: 300px; display: block; margin: 0 auto;">`;
             } else {
-                // Otherwise show the label/name/id
-                div.innerText = subtopicLabel;
+              // Otherwise show the label/name/id
+              div.innerText = subtopicLabel;
             }
-            
-            div.onclick = () => openSubtopicJsonEditor(doc.id, subtopicLabel);
+
+            div.onclick = () => openSubtopicJsonEditor(data.id, subtopicLabel);
             contentList.appendChild(div);
+          });
+
+          // Check if subtopicsCount needs update
+          const topicRef = db
+            .collection(currentCollection)
+            .doc(currentDocId)
+            .collection("chapters")
+            .doc(currentChapterId)
+            .collection("topics")
+            .doc(topicId);
+
+          topicRef.get().then((doc) => {
+            if (doc.exists) {
+              const data = doc.data();
+              if (data.subtopicsCount === undefined) {
+                const count = querySnapshot.size;
+                topicRef
+                  .update({ subtopicsCount: count })
+                  .then(() => console.log(`Updated subtopicsCount to ${count}`))
+                  .catch((e) =>
+                    console.error("Error updating subtopicsCount", e),
+                  );
+              }
+            }
           });
         } catch (error) {
           console.error("Error fetching subtopics: ", error);
@@ -845,8 +992,23 @@
 
       // Chapter Modal Logic
       function openAddChapterModal() {
+        editingChapterId = null;
+        document.querySelector("#addChapterModal h3").innerText =
+          "Add New Chapter";
         document.getElementById("addChapterModal").style.display = "block";
         document.getElementById("newChapterName").value = "";
+        document.getElementById("newChapterOrder").value = "";
+        document.getElementById("newChapterIcon").value = "";
+      }
+
+      function openEditChapterModal(id, data) {
+        editingChapterId = id;
+        document.querySelector("#addChapterModal h3").innerText =
+          "Edit Chapter";
+        document.getElementById("addChapterModal").style.display = "block";
+        document.getElementById("newChapterName").value = data.name || "";
+        document.getElementById("newChapterOrder").value = data.order || "";
+        document.getElementById("newChapterIcon").value = data.icon || "";
       }
 
       function closeAddChapterModal() {
@@ -857,6 +1019,11 @@
         const chapterName = document
           .getElementById("newChapterName")
           .value.trim();
+        const iconName = document.getElementById("newChapterIcon").value.trim();
+        const orderVal = document
+          .getElementById("newChapterOrder")
+          .value.trim();
+
         if (!chapterName) {
           alert("Please enter a chapter name");
           return;
@@ -867,15 +1034,32 @@
         closeAddChapterModal();
 
         try {
-          await db
-            .collection(currentCollection)
-            .doc(currentDocId)
-            .collection("chapters")
-            .add({
-              name: chapterName,
-            });
+          const chapterData = {
+            name: chapterName,
+          };
+          if (iconName) {
+            chapterData.icon = iconName;
+          }
+          if (orderVal) {
+            chapterData.order = parseInt(orderVal, 10);
+          }
 
-          alert("Chapter added successfully!");
+          if (editingChapterId) {
+            await db
+              .collection(currentCollection)
+              .doc(currentDocId)
+              .collection("chapters")
+              .doc(editingChapterId)
+              .update(chapterData);
+            alert("Chapter updated successfully!");
+          } else {
+            await db
+              .collection(currentCollection)
+              .doc(currentDocId)
+              .collection("chapters")
+              .add(chapterData);
+            alert("Chapter added successfully!");
+          }
 
           // Refresh chapters list
           showDocumentDetails(currentDocId, currentDocData);
@@ -917,6 +1101,20 @@
             .add({
               name: topicName,
             });
+
+          // Increment topicsCount
+          const chapterRef = db
+            .collection(currentCollection)
+            .doc(currentDocId)
+            .collection("chapters")
+            .doc(currentChapterId);
+
+          // Use increment to safely add 1
+          chapterRef
+            .update({
+              topicsCount: firebase.firestore.FieldValue.increment(1),
+            })
+            .catch((e) => console.error("Error incrementing topicsCount", e));
 
           alert("Topic added successfully!");
           fetchTopics(currentChapterId, currentChapterNameString); // Refresh the topics list
@@ -963,6 +1161,24 @@
               name: subtopicName,
             });
 
+          // Increment subtopicsCount
+          const topicRef = db
+            .collection(currentCollection)
+            .doc(currentDocId)
+            .collection("chapters")
+            .doc(currentChapterId)
+            .collection("topics")
+            .doc(currentTopicId);
+
+          // Use increment to safely add 1
+          topicRef
+            .update({
+              subtopicsCount: firebase.firestore.FieldValue.increment(1),
+            })
+            .catch((e) =>
+              console.error("Error incrementing subtopicsCount", e),
+            );
+
           alert("Subtopic added successfully!");
           fetchSubtopics(currentTopicId, currentTopicNameString); // Refresh the subtopics list
         } catch (error) {
@@ -981,6 +1197,9 @@
           "subtopicFieldsContainer",
         );
         const newTextarea = document.getElementById("subtopicNewJsonTextarea");
+        const questionTextInput = document.getElementById("questionTextInput");
+        const primaryVideoInput = document.getElementById("primaryVideoInput");
+        const orderInput = document.getElementById("orderInput");
         const title = document.getElementById("subtopicJsonTitle");
         const loading = document.getElementById("loading");
 
@@ -990,6 +1209,9 @@
         modal.style.display = "block";
         fieldsContainer.innerHTML = ""; // Clear previous fields
         newTextarea.value = "";
+        questionTextInput.value = "";
+        primaryVideoInput.value = "";
+        orderInput.value = "";
 
         if (!subtopicId) {
           fieldsContainer.innerHTML =
@@ -1014,8 +1236,58 @@
             if (doc.exists) {
               const data = doc.data();
               if (data) {
+                // Populate Question Text if exists
+                if (data.questiontext) {
+                  questionTextInput.value = data.questiontext;
+                }
+
+                // Populate Order if exists
+                if (data.order !== undefined) {
+                  orderInput.value = data.order;
+                }
+
+                // Populate Primary Video if exists (based on nested nodes structure)
+                let primaryVideoUrl = "";
+                let firstNode = null;
+
+                if (data.nodes) {
+                  if (Array.isArray(data.nodes) && data.nodes.length > 0) {
+                    firstNode = data.nodes[0];
+                  } else if (data.nodes["0"]) {
+                    firstNode = data.nodes["0"];
+                  }
+                }
+
+                if (firstNode && firstNode.data && firstNode.data.url) {
+                  primaryVideoUrl = firstNode.data.url;
+                } else if (data.url && data.videoType === "primary") {
+                  // Fallback for previous schema
+                  primaryVideoUrl = data.url;
+                } else if (data.primaryvideo) {
+                  // Fallback for legacy data
+                  primaryVideoUrl = data.primaryvideo;
+                }
+                if (primaryVideoUrl) {
+                  primaryVideoInput.value = primaryVideoUrl;
+                }
+
                 // Generate input fields for each key
                 Object.keys(data).forEach((key) => {
+                  if (
+                    key === "questiontext" ||
+                    key === "order" ||
+                    key === "primaryvideo" ||
+                    key === "url" ||
+                    key === "videoType" ||
+                    key === "label" ||
+                    key === "isEndOfLesson" ||
+                    key === "nodes" ||
+                    key === "connections" ||
+                    key === "flowId" ||
+                    key === "createdAt"
+                  )
+                    return; // Skip these as they have dedicated inputs or are managed automatically
+
                   const row = document.createElement("div");
                   row.style.marginBottom = "10px";
 
@@ -1064,6 +1336,64 @@
           const value = input.value;
           jsonData[key] = value;
         });
+
+        // Add Question Text
+        const questionTextInput = document.getElementById("questionTextInput");
+        const questionText = questionTextInput.value.trim();
+        if (questionText) {
+          jsonData.questiontext = questionText;
+        }
+
+        // Add Primary Video
+        const primaryVideoInput = document.getElementById("primaryVideoInput");
+        const primaryVideo = primaryVideoInput.value.trim();
+        if (primaryVideo) {
+          // Check if we need to construct the complex node structure
+          if (!jsonData.flowId)
+            jsonData.flowId = crypto.randomUUID
+              ? crypto.randomUUID()
+              : "flow_" + Date.now();
+          if (!jsonData.createdAt)
+            jsonData.createdAt = new Date().toISOString();
+
+          // Construct the primary video node (Node "0")
+          const videoNode = {
+            id: "node_1",
+            type: "primaryVideo", // Restored to root as it is required by Android app
+            data: {
+              isEndOfLesson: true,
+              label: "primaryVideo",
+              url: primaryVideo,
+              videoType: "primary",
+            },
+            meta: {
+              isTerminal: true,
+              nodeStatus: "TERMINAL_EXIT",
+              type: "primaryVideo",
+            },
+            events: [],
+          };
+
+          // Save as Array (Fix for Android JSONException)
+          jsonData.nodes = [videoNode];
+
+          // Ensure connections is an array
+          jsonData.connections = [];
+
+          // Cleanup flat fields if they exist (migration)
+          delete jsonData.url;
+          delete jsonData.videoType;
+          delete jsonData.label;
+          delete jsonData.isEndOfLesson;
+          delete jsonData.primaryvideo;
+        }
+
+        // Add Order
+        const orderInput = document.getElementById("orderInput");
+        const orderValue = orderInput.value.trim();
+        if (orderValue !== "") {
+          jsonData.order = parseInt(orderValue, 10);
+        }
 
         // Gather data from new JSON textarea
         const newTextarea = document.getElementById("subtopicNewJsonTextarea");

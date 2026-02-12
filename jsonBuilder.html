@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSON Builder</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        height: 100vh;
+        justify-content: center;
+        align-items: center;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 80%;
+        max-width: 800px;
+      }
+      textarea {
+        width: 100%;
+        height: 400px;
+        padding: 10px;
+        font-family: monospace;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        box-sizing: border-box;
+      }
+      button {
+        padding: 12px 24px;
+        font-size: 16px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      #status {
+        margin-top: 15px;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>JSON Builder - Upload to test/t1</h2>
+      <div
+        id="currentUser"
+        style="margin-bottom: 15px; font-size: 14px; color: #555"
+      ></div>
+      <textarea id="jsonInput" placeholder="Paste your JSON here..."></textarea>
+      <button id="uploadBtn">Upload to Firestore</button>
+      <div id="status"></div>
+    </div>
+
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyDNqfRczOHTukGdXDnuzVXjbL7P5blnyAo",
+        authDomain: "dbydx-ea226.firebaseapp.com",
+        projectId: "dbydx-ea226",
+        storageBucket: "dbydx-ea226.firebasestorage.app",
+        messagingSenderId: "329650707379",
+        appId: "1:329650707379:web:18bab2bab403e1004b89c6",
+        measurementId: "G-2F7YVE2X94",
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+      const auth = firebase.auth();
+
+      // Check auth state
+      auth.onAuthStateChanged((user) => {
+        const userDiv = document.getElementById("currentUser");
+        if (user) {
+          console.log("User is logged in:", user.uid);
+          userDiv.textContent = `Logged in as: ${user.email || "Anonymous User"}`;
+        } else {
+          console.log(
+            "User is not logged in. Firestore writes might fail depending on rules.",
+          );
+          userDiv.textContent = "Not logged in";
+        }
+      });
+
+      const uploadBtn = document.getElementById("uploadBtn");
+      const jsonInput = document.getElementById("jsonInput");
+      const statusDiv = document.getElementById("status");
+
+      uploadBtn.addEventListener("click", async () => {
+        const jsonText = jsonInput.value;
+        statusDiv.textContent = "Uploading...";
+        statusDiv.className = "";
+
+        try {
+          // Parse JSON to ensure it's valid
+          const data = JSON.parse(jsonText);
+
+          // Upload to Firestore: collection 'test', document 't1'
+          await db.collection("test").doc("t1").set(data);
+
+          statusDiv.textContent = "Successfully uploaded to test/t1!";
+          statusDiv.className = "success";
+        } catch (error) {
+          console.error("Error:", error);
+          if (error instanceof SyntaxError) {
+            statusDiv.textContent = "Invalid JSON format: " + error.message;
+          } else {
+            statusDiv.textContent = "Error uploading: " + error.message;
+          }
+          statusDiv.className = "error";
+        }
+      });
+    </script>
+  </body>
+</html>

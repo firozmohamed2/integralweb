@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Revision Manager - Integral Web</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f8fafc;
+      }
+    </style>
+  </head>
+  <body class="text-slate-800 antialiased">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+      <!-- Header -->
+      <header class="mb-8 flex justify-between items-center">
+        <div>
+          <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+            Revision Manager
+          </h1>
+          <p class="text-slate-500 text-sm mt-1">
+            Add and organize your revision questions
+          </p>
+        </div>
+        <div class="flex gap-4">
+          <a
+            href="view_revision.html"
+            class="text-sm font-medium text-green-600 hover:text-green-800 flex items-center gap-1"
+          >
+            <i data-lucide="book-open" class="w-4 h-4"></i> View Revisions
+          </a>
+          <a
+            href="index.html"
+            class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+          >
+            <i data-lucide="home" class="w-4 h-4"></i> Home
+          </a>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <div id="mainContent" class="hidden">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Left Column: Selection & Input -->
+          <div class="md:col-span-1 space-y-6">
+            <!-- Context Selection -->
+            <div
+              class="bg-white rounded-xl shadow-sm border border-slate-200 p-5"
+            >
+              <h2 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i data-lucide="filter" class="w-4 h-4 text-blue-500"></i>
+                Select Context
+              </h2>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 mb-1"
+                    >CLASS</label
+                  >
+                  <select
+                    id="classSelect"
+                    title="Select Class"
+                    class="w-full border-slate-200 rounded-lg p-2 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-100 outline-none"
+                  >
+                    <option value="">Select Class...</option>
+                    <option value="Class 11">Class 11</option>
+                    <option value="Class 12">Class 12</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 mb-1"
+                    >SUBJECT</label
+                  >
+                  <select
+                    id="subjectSelect"
+                    title="Select Subject"
+                    disabled
+                    class="w-full border-slate-200 rounded-lg p-2 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-100 outline-none disabled:opacity-50"
+                  >
+                    <option value="">Select Subject...</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 mb-1"
+                    >CHAPTER</label
+                  >
+                  <select
+                    id="chapterSelect"
+                    title="Select Chapter"
+                    disabled
+                    class="w-full border-slate-200 rounded-lg p-2 text-sm bg-slate-50 focus:ring-2 focus:ring-blue-100 outline-none disabled:opacity-50"
+                  >
+                    <option value="">Select Chapter...</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="bg-blue-50 rounded-xl p-5 border border-blue-100">
+              <h3 class="font-bold text-blue-900 text-sm mb-2">
+                How to add questions?
+              </h3>
+              <p class="text-xs text-blue-700 leading-relaxed mb-2">
+                Paste your questions in the text area below. The AI will
+                automatically identify questions and answers.
+              </p>
+              <pre
+                class="bg-white p-2 rounded border border-blue-100 text-[10px] text-slate-600 overflow-x-auto"
+              >
+Question: What is physics?
+Answer: Study of matter and energy.
+
+Question: Define atom.
+Answer: Basic unit of matter.</pre
+              >
+            </div>
+          </div>
+
+          <!-- Right Column: Input & Preview -->
+          <div class="md:col-span-2 space-y-6">
+            <!-- Input Area -->
+            <div
+              class="bg-white rounded-xl shadow-sm border border-slate-200 p-5"
+            >
+              <label
+                class="block font-bold text-slate-800 mb-2 flex items-center gap-2"
+              >
+                <i data-lucide="file-text" class="w-4 h-4 text-purple-500"></i>
+                Bulk Input
+              </label>
+              <textarea
+                id="bulkInput"
+                class="w-full h-64 p-4 rounded-lg border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-blue-100 outline-none resize-none"
+                placeholder="Paste your questions here..."
+              ></textarea>
+              <div class="mt-4 flex justify-end">
+                <button
+                  id="parseBtn"
+                  class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-900 transition flex items-center gap-2"
+                >
+                  <i data-lucide="cpu"></i> Process with AI
+                </button>
+              </div>
+            </div>
+
+            <!-- Preview Area -->
+            <div
+              id="previewSection"
+              class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-5"
+            >
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold text-slate-800 flex items-center gap-2">
+                  <i data-lucide="eye" class="w-4 h-4 text-green-500"></i>
+                  Preview (<span id="previewCount">0</span>)
+                </h2>
+                <button
+                  id="saveBtn"
+                  class="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-green-700 transition flex items-center gap-2 shadow-sm"
+                >
+                  <i data-lucide="save"></i> Save to Database
+                </button>
+              </div>
+              <div
+                id="previewList"
+                class="space-y-3 max-h-[500px] overflow-y-auto pr-2"
+              >
+                <!-- Parsed items will appear here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Login Warning -->
+      <div id="loginWarning" class="text-center py-20 hidden">
+        <div
+          class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 inline-block max-w-md"
+        >
+          <div
+            class="bg-yellow-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <i data-lucide="lock" class="text-yellow-600 w-6 h-6"></i>
+          </div>
+          <h2 class="text-xl font-bold text-slate-900 mb-2">
+            Authentication Required
+          </h2>
+          <p class="text-slate-500 mb-6">
+            Please log in via the Study Tracker page to manage revisions.
+          </p>
+          <a
+            href="study_tracker.html"
+            class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+          >
+            Go to Login
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import {
+        getAuth,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      import {
+        getFirestore,
+        collection,
+        addDoc,
+        serverTimestamp,
+        writeBatch,
+        doc,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDNqfRczOHTukGdXDnuzVXjbL7P5blnyAo",
+        authDomain: "dbydx-ea226.firebaseapp.com",
+        projectId: "dbydx-ea226",
+        storageBucket: "dbydx-ea226.firebasestorage.app",
+        messagingSenderId: "329650707379",
+        appId: "1:329650707379:web:18bab2bab403e1004b89c6",
+        measurementId: "G-2F7YVE2X94",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      // Syllabus Data (Same as study_tracker.html)
+      const SYLLABUS_DATA = {
+        "Class 11": {
+          Physics: [
+            "Physical World",
+            "Units and Measurements",
+            "Motion in a Straight Line",
+            "Motion in a Plane",
+            "Laws of Motion",
+            "Work, Energy and Power",
+            "System of Particles and Rotational Motion",
+            "Gravitation",
+            "Mechanical Properties of Solids",
+            "Mechanical Properties of Fluids",
+            "Thermal Properties of Matter",
+            "Thermodynamics",
+            "Kinetic Theory",
+            "Oscillations",
+            "Waves",
+          ],
+          Chemistry: [
+            "Some Basic Concepts of Chemistry",
+            "Structure of Atom",
+            "Classification of Elements and Periodicity in Properties",
+            "Chemical Bonding and Molecular Structure",
+            "States of Matter",
+            "Thermodynamics",
+            "Equilibrium",
+            "Redox Reactions",
+            "Hydrogen",
+            "The s-Block Elements",
+            "The p-Block Elements",
+            "Organic Chemistry – Some Basic Principles and Techniques",
+            "Hydrocarbons",
+            "Environmental Chemistry",
+          ],
+          Mathematics: [
+            "Sets",
+            "Relations and Functions",
+            "Trigonometric Functions",
+            "Complex Numbers and Quadratic Equations",
+            "Linear Inequalities",
+            "Permutations and Combinations",
+            "Binomial Theorem",
+            "Sequences and Series",
+            "Straight Lines",
+            "Conic Sections",
+            "Introduction to Three Dimensional Geometry",
+            "Limits and Derivatives",
+            "Statistics",
+            "Probability",
+          ],
+          Biology: [
+            "The Living World",
+            "Biological Classification",
+            "Plant Kingdom",
+            "Animal Kingdom",
+            "Morphology of Flowering Plants",
+            "Anatomy of Flowering Plants",
+            "Structural Organisation in Animals",
+            "Cell: The Unit of Life",
+            "Biomolecules",
+            "Cell Cycle and Cell Division",
+            "Transport in Plants",
+            "Mineral Nutrition",
+            "Photosynthesis in Higher Plants",
+            "Respiration in Plants",
+            "Plant Growth and Development",
+            "Digestion and Absorption",
+            "Breathing and Exchange of Gases",
+            "Body Fluids and Circulation",
+            "Excretory Products and their Elimination",
+            "Locomotion and Movement",
+            "Neural Control and Coordination",
+            "Chemical Coordination and Integration",
+          ],
+          "Computer Science": [
+            "Computer System Overview",
+            "Data Representation",
+            "Boolean Logic",
+            "Getting Started with Python",
+            "Python Fundamentals",
+            "Data Handling",
+            "Flow of Control",
+            "Strings",
+            "Lists",
+            "Tuples and Dictionaries",
+            "Cyber Safety",
+          ],
+        },
+        "Class 12": {
+          Physics: [
+            "Electric Charges and Fields",
+            "Electrostatic Potential and Capacitance",
+            "Current Electricity",
+            "Moving Charges and Magnetism",
+            "Magnetism and Matter",
+            "Electromagnetic Induction",
+            "Alternating Current",
+            "Electromagnetic Waves",
+            "Ray Optics and Optical Instruments",
+            "Wave Optics",
+            "Dual Nature of Radiation and Matter",
+            "Atoms",
+            "Nuclei",
+            "Semiconductor Electronics",
+            "Communication Systems",
+          ],
+          Chemistry: [
+            "The Solid State",
+            "Solutions",
+            "Electrochemistry",
+            "Chemical Kinetics",
+            "Surface Chemistry",
+            "General Principles and Processes of Isolation of Elements",
+            "The p-Block Elements",
+            "The d- and f-Block Elements",
+            "Coordination Compounds",
+            "Haloalkanes and Haloarenes",
+            "Alcohols, Phenols and Ethers",
+            "Aldehydes, Ketones and Carboxylic Acids",
+            "Amines",
+            "Biomolecules",
+            "Polymers",
+            "Chemistry in Everyday Life",
+          ],
+          Mathematics: [
+            "Relations and Functions",
+            "Inverse Trigonometric Functions",
+            "Matrices",
+            "Determinants",
+            "Continuity and Differentiability",
+            "Applications of Derivatives",
+            "Integrals",
+            "Applications of Integrals",
+            "Differential Equations",
+            "Vector Algebra",
+            "Three Dimensional Geometry",
+            "Linear Programming",
+            "Probability",
+          ],
+          Biology: [
+            "Reproduction in Organisms",
+            "Sexual Reproduction in Flowering Plants",
+            "Human Reproduction",
+            "Reproductive Health",
+            "Principles of Inheritance and Variation",
+            "Molecular Basis of Inheritance",
+            "Evolution",
+            "Human Health and Disease",
+            "Strategies for Enhancement in Food Production",
+            "Microbes in Human Welfare",
+            "Biotechnology: Principles and Processes",
+            "Biotechnology and its Applications",
+            "Organisms and Populations",
+            "Ecosystem",
+            "Biodiversity and Conservation",
+            "Environmental Issues",
+          ],
+          "Computer Science": [
+            "Revision of Python Basics",
+            "Functions",
+            "File Handling",
+            "Exception Handling",
+            "Recursion",
+            "Data Structures",
+            "Stack",
+            "Queue",
+            "Searching",
+            "Sorting",
+            "Database Concepts",
+            "Structured Query Language",
+            "Computer Networks",
+          ],
+        },
+      };
+
+      // UI References
+      const mainContent = document.getElementById("mainContent");
+      const loginWarning = document.getElementById("loginWarning");
+      const classSelect = document.getElementById("classSelect");
+      const subjectSelect = document.getElementById("subjectSelect");
+      const chapterSelect = document.getElementById("chapterSelect");
+      const bulkInput = document.getElementById("bulkInput");
+      const parseBtn = document.getElementById("parseBtn");
+      const previewSection = document.getElementById("previewSection");
+      const previewList = document.getElementById("previewList");
+      const previewCount = document.getElementById("previewCount");
+      const saveBtn = document.getElementById("saveBtn");
+
+      let parsedQuestions = [];
+
+      // Auth Check
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          mainContent.classList.remove("hidden");
+          loginWarning.classList.add("hidden");
+          lucide.createIcons();
+        } else {
+          mainContent.classList.add("hidden");
+          loginWarning.classList.remove("hidden");
+        }
+      });
+
+      // Populate Dropdowns
+      classSelect.addEventListener("change", () => {
+        const selectedClass = classSelect.value;
+        subjectSelect.innerHTML = '<option value="">Select Subject...</option>';
+        chapterSelect.innerHTML = '<option value="">Select Chapter...</option>';
+        subjectSelect.disabled = true;
+        chapterSelect.disabled = true;
+
+        if (selectedClass && SYLLABUS_DATA[selectedClass]) {
+          subjectSelect.disabled = false;
+          Object.keys(SYLLABUS_DATA[selectedClass]).forEach((subject) => {
+            const option = document.createElement("option");
+            option.value = subject;
+            option.textContent = subject;
+            subjectSelect.appendChild(option);
+          });
+        }
+      });
+
+      subjectSelect.addEventListener("change", () => {
+        const selectedClass = classSelect.value;
+        const selectedSubject = subjectSelect.value;
+        chapterSelect.innerHTML = '<option value="">Select Chapter...</option>';
+        chapterSelect.disabled = true;
+
+        if (
+          selectedClass &&
+          selectedSubject &&
+          SYLLABUS_DATA[selectedClass][selectedSubject]
+        ) {
+          chapterSelect.disabled = false;
+          SYLLABUS_DATA[selectedClass][selectedSubject].forEach((chapter) => {
+            const option = document.createElement("option");
+            option.value = chapter;
+            option.textContent = chapter;
+            chapterSelect.appendChild(option);
+          });
+        }
+      });
+
+      // Parsing Logic (OpenAI via Local Proxy)
+      const API_KEY = "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";
+
+      parseBtn.addEventListener("click", async () => {
+        const text = bulkInput.value.trim();
+        if (!text) {
+          alert("Please enter some text to process.");
+          return;
+        }
+
+        // Loading state
+        parseBtn.disabled = true;
+        parseBtn.innerHTML =
+          '<i data-lucide="loader-2" class="animate-spin"></i> Processing...';
+        parsedQuestions = [];
+
+        try {
+          // Call our local proxy server instead of OpenAI directly to avoid CORS
+          const response = await fetch("http://localhost:3000/api/parse-questions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: text,
+              apiKey: API_KEY
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          const jsonContent = data.choices[0].message.content;
+          const parsedData = JSON.parse(jsonContent);
+          
+          if (Array.isArray(parsedData)) {
+              parsedQuestions = parsedData;
+          } else if (parsedData.questions && Array.isArray(parsedData.questions)) {
+              parsedQuestions = parsedData.questions;
+          } else {
+              const possibleArray = Object.values(parsedData).find(val => Array.isArray(val));
+              if (possibleArray) {
+                  parsedQuestions = possibleArray;
+              } else {
+                  throw new Error("Could not find a list of questions in the AI response.");
+              }
+          }
+
+          renderPreview();
+        } catch (error) {
+          console.error("Error parsing with OpenAI:", error);
+          alert(
+            "Failed to process with AI. Please make sure the local server is running (node server.js).\nError: " +
+              error.message,
+          );
+        } finally {
+          parseBtn.disabled = false;
+          parseBtn.innerHTML = '<i data-lucide="cpu"></i> Process with AI';
+          lucide.createIcons();
+        }
+      });
+
+      function renderPreview() {
+        previewList.innerHTML = "";
+        previewCount.textContent = parsedQuestions.length;
+
+        if (parsedQuestions.length > 0) {
+          previewSection.classList.remove("hidden");
+          parsedQuestions.forEach((item, index) => {
+            const el = document.createElement("div");
+            el.className =
+              "bg-slate-50 p-4 rounded-lg border border-slate-100 text-sm relative group hover:border-blue-200 transition-colors";
+            el.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded">#${item.serial}</span>
+                        <button class="improve-btn text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2 py-1 rounded flex items-center gap-1 transition-colors" data-index="${index}">
+                            <i data-lucide="sparkles" class="w-3 h-3"></i> Improve
+                        </button>
+                    </div>
+                    <p class="font-semibold text-slate-800 mb-1 whitespace-pre-wrap">Q: ${item.question}</p>
+                    <p class="text-slate-600 whitespace-pre-wrap">A: ${item.answer}</p>
+                `;
+            previewList.appendChild(el);
+          });
+
+          // Attach event listeners to improve buttons
+          document.querySelectorAll('.improve-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const index = e.currentTarget.dataset.index;
+                await improveQuestion(index, e.currentTarget);
+            });
+          });
+
+        } else {
+          previewSection.classList.add("hidden");
+          alert("No questions found! Please check the format.");
+        }
+        lucide.createIcons();
+      }
+
+      async function improveQuestion(index, btn) {
+        const item = parsedQuestions[index];
+        const originalText = btn.innerHTML;
+        
+        // Loading state
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader-2" class="animate-spin w-3 h-3"></i> Improving...';
+        lucide.createIcons();
+
+        try {
+            const response = await fetch("http://localhost:3000/api/improve-question", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    question: item.question,
+                    answer: item.answer,
+                    apiKey: API_KEY
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            const jsonContent = data.choices[0].message.content;
+            const improvedData = JSON.parse(jsonContent);
+
+            // Update the question
+            parsedQuestions[index].question = improvedData.question;
+            parsedQuestions[index].answer = improvedData.answer;
+
+            // Re-render
+            renderPreview();
+
+        } catch (error) {
+            console.error("Error improving question:", error);
+            alert("Failed to improve question: " + error.message);
+            
+            // Reset button state on error
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            lucide.createIcons();
+        }
+      }
+
+      // Save Logic
+      saveBtn.addEventListener("click", async () => {
+        if (
+          !classSelect.value ||
+          !subjectSelect.value ||
+          !chapterSelect.value
+        ) {
+          alert("Please select Class, Subject, and Chapter first.");
+          return;
+        }
+
+        if (parsedQuestions.length === 0) return;
+
+        const user = auth.currentUser;
+        if (!user) return;
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML =
+          '<i data-lucide="loader-2" class="animate-spin"></i> Saving...';
+
+        const batch = writeBatch(db);
+        const timestamp = serverTimestamp();
+
+        parsedQuestions.forEach((q) => {
+          const docRef = doc(collection(db, "revision_questions"));
+          batch.set(docRef, {
+            userId: user.uid,
+            classStream: classSelect.value,
+            subject: subjectSelect.value,
+            chapter: chapterSelect.value,
+            serial: parseInt(q.serial),
+            question: q.question,
+            answer: q.answer,
+            createdAt: timestamp,
+          });
+        });
+
+        try {
+          await batch.commit();
+          alert(`Successfully saved ${parsedQuestions.length} questions!`);
+          bulkInput.value = "";
+          parsedQuestions = [];
+          renderPreview();
+        } catch (error) {
+          console.error("Error saving questions:", error);
+          alert("Failed to save questions: " + error.message);
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = '<i data-lucide="save"></i> Save to Database';
+          lucide.createIcons();
+        }
+      });
+
+      lucide.createIcons();
+    </script>
+  </body>
+</html>
